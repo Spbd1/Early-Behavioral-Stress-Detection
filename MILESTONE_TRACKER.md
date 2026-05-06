@@ -1,0 +1,59 @@
+# Milestone Tracker
+
+This tracker is initialized from `IMPLEMENTATION_PLAN.md`, `FINALIZATION_CHECKLIST.md`, and `ROADMAP.md`. It should be updated at the end of every implementation milestone. Status values are `Not started`, `In progress`, `Blocked`, `Validation pending`, `Complete`, or `Deferred`.
+
+## Must-have production requirements
+
+| ID | Milestone | Status | Blockers | Dependencies | Validation state | Technical debt notes |
+|---|---|---|---|---|---|---|
+| P0 | Governance, scope, and prototype boundary freeze | Not started | Stakeholder agreement needed for intended users, geographies, cadence, alert recipients, and prohibited uses. | None | Not validated; documentation and repository-claim review pending. | README warnings are partial; prototype/stub inventory needs an owner and update process. |
+| P1 | Source registry, contracts, and local storage foundation | Not started | Storage target and metadata schema decisions pending. | P0 | Not validated; contract, quality, append-only storage, and replay tests pending. | Existing ingestion/preprocessing code is prototype-oriented and lacks lineage contracts. |
+| P2 | Connector interface and Google Trends ingestion | Not started | Legal/terms review for source collection; connector package/API choice; fixture acquisition. | P0, P1 | Not validated; fixture, retry/backoff, normalization, outage, and replay tests pending. | Existing data path is synthetic-only and has no typed connector abstraction. |
+| P3 | Curated features, transform registry, and feature snapshots | Not started | Feature schema conventions, missing-data policy, and transform metadata format pending. | P1, P2 | Not validated; transform persistence, leakage, schema-ordering, and snapshot immutability tests pending. | Current winsorization/standardization helpers are not sufficient for inference-time reuse. |
+| P4 | Experiment tracking and model registry foundation | Not started | Registry backend and approval metadata format pending; dependency lock strategy pending. | P3 | Not validated; artifact metadata, diagnostics, registry transition, and rollback tests pending. | Current adaptive HMM is prototype-ready but lacks production artifact metadata and lifecycle states. |
+| P5 | Decision-time validation, baselines, and calibration governance | Not started | Event/target catalog definitions, label vintages, and review ownership pending. | P3, P4 | Not validated; decision-time backtest, baseline, calibration, robustness, and statistical review tests pending. | Synthetic validation exists, but real-world evidence and calibration governance are missing. |
+| P6 | Shadow-mode inference and drift monitoring | Not started | Scheduler choice, prediction store shape, monitoring thresholds, and internal report format pending. | P4, P5 | Not validated; idempotent inference, data-quality blocking, drift monitor, logging, dashboard, and runbook tests pending. | Drift monitoring is placeholder-only and operational observability is missing. |
+| P7 | Human-reviewed experimental alert workflow | Not started | Reviewer workflow owner, delivery policy, alert severity taxonomy, and postmortem process pending. | P5, P6 | Not validated; alert rule, suppression, approval gate, audit field, and blocked-delivery tests pending. | Alerting must remain disabled until calibrated thresholds and statistical review are approved. |
+| P8 | Security, deployment, and operational hardening | Not started | Deployment target, secrets provider, auth model, IaC platform, and SLO ownership pending. | P1-P7 for full production hardening; CI improvements can begin earlier after P0. | Not validated; CI, scan, access-control, backup/restore, rollback, and load tests pending. | CI/CD is partial; secrets, auth, IaC, backup/restore, and performance evidence are missing. |
+
+## Research enhancements
+
+| ID | Milestone | Status | Blockers | Dependencies | Validation state | Technical debt notes |
+|---|---|---|---|---|---|---|
+| R1 | Governed ontology and LLM keyword workflow | Not started | LLM provider terms review, prompt governance, sensitive-term policy, and reviewer availability pending. | P0; ingestion promotion also requires P2-P3. | Not validated; ontology versioning, prompt schema, filter, review, validation, and retirement tests pending. | Static synthetic ontology/codebook exists but lacks review state and versioned promotion workflow. |
+| R2 | Multi-source and multi-region research panels | Not started | Additional source selection, terms review, region scope, and cost expectations pending. | P1-P3; comparative validation requires P5. | Not validated; additional connector fixture tests and multi-region snapshot validation pending. | Single-source dependence remains a critical risk until another aggregate source is integrated. |
+| R3 | Robustness, placebo, and negative-control evidence pack | Not started | Approved event catalog, feature snapshots, and statistical review rubric pending. | P5 | Not validated; robustness report, placebo, negative-control, source-outage, and sensitivity tests pending. | Causal/validation modules exist but need registry-backed evidence packaging and caveat discipline. |
+| R4 | Advanced model comparison automation | Not started | Comparable model configurations, compute budget, and model promotion criteria pending. | P4, P5 | Not validated; model comparison runner and metric-parity tests pending. | Baseline coverage is partial and comparisons are not yet registry-backed. |
+
+## Optional experimental features
+
+| ID | Milestone | Status | Blockers | Dependencies | Validation state | Technical debt notes |
+|---|---|---|---|---|---|---|
+| X1 | Interactive research dashboard extensions | Deferred | Must not distract from storage, validation, and alert governance; access-control design pending for broad use. | P6 for artifact-backed display; P8 for non-local deployment. | Not validated; read-only dashboard and artifact-citation smoke tests pending. | Dashboard/demo scaffolds should not become de facto production orchestration. |
+| X2 | Cost and performance simulation harness | Deferred | Planned source/keyword/region volumes and provider cost assumptions pending. | P2-P3 for realistic parameters; P8 for load-test integration. | Not validated; deterministic simulator and load-test threshold tests pending. | No cost monitoring or capacity model exists. |
+| X3 | Automated periodic independent review package | Deferred | Reviewer process, access controls, and evidence-bundle scope pending. | P5; stronger value after P7 alert audit data; P8 for secure sharing. | Not validated; manifest generation and reproduction-instruction tests pending. | Independent review should not be represented as complete until human sign-off exists. |
+
+## Cross-milestone validation ledger
+
+| Validation area | Current state | Next milestone to advance | Notes |
+|---|---|---|---|
+| Repository claim/safety scan | Pending | P0 | Confirm docs and demos do not imply validated production, diagnostic, causal, or recession-prediction capability. |
+| Source terms and registry review | Pending | P1 | Required before live connector operation. |
+| Fixture-only connector tests | Pending | P2 | Required to avoid flaky tests and live-network dependence. |
+| Immutable raw-to-feature replay | Pending | P3 | Required before model training claims are reproducible. |
+| Model artifact reproducibility | Pending | P4 | Must include git commit, dependency lock, config hash, feature snapshot, and seed. |
+| Decision-time backtesting | Pending | P5 | Must prove no future information is used. |
+| Calibration and threshold approval | Pending | P5 | Required before any alert milestone can proceed. |
+| Shadow-mode operational health | Pending | P6 | Must run internally with no external delivery. |
+| Human-reviewed alert auditability | Pending | P7 | Required for reviewed experimental alerts. |
+| Deployment and rollback evidence | Pending | P8 | Required for controlled production operation. |
+
+## Update protocol
+
+When a milestone implementation begins or completes:
+
+1. Update the milestone row status, blockers, dependencies, validation state, and technical debt notes.
+2. Link or name the validation artifacts produced by the milestone.
+3. Record any new risks in `docs/risk_register.md` once that file exists.
+4. Update `FINALIZATION_CHECKLIST.md` gate statuses only when code, configuration, tests, documentation, and operational evidence exist.
+5. Keep deferred optional work deferred unless it has no negative impact on must-have production requirements.
