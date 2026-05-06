@@ -11,9 +11,10 @@ from behavioral_stress.data.preprocessing import standardize_frame, winsorize_fr
 from behavioral_stress.data.synthetic import generate_synthetic_regime_data
 from behavioral_stress.models.adaptive_hmm import AdaptiveHMM
 from behavioral_stress.ontology.ontology import validate_codebook
+from behavioral_stress.ops.config_validation import validate_runtime_config
+from behavioral_stress.ops.lineage import build_lineage_manifest, model_version_id
 from behavioral_stress.utils.config import load_config
 from behavioral_stress.validation.synthetic_validation import evaluate_stress_probability
-
 
 WORKFLOW_WARNING = (
     "Experimental research prototype. Not a validated recession predictor. "
@@ -24,6 +25,10 @@ WORKFLOW_WARNING = (
 def run_synthetic_workflow(config_path: str | Path) -> dict[str, Any]:
     """Run config → data → preprocessing → ontology → AdaptiveHMM → metrics → output files."""
     cfg = load_config(config_path)
+    config_report = validate_runtime_config(cfg)
+    if not config_report.ok:
+        messages = "; ".join(f"{issue.path}: {issue.message}" for issue in config_report.issues)
+        raise ValueError(f"Invalid workflow config: {messages}")
     synth_cfg = dict(cfg.get("synthetic", {}))
     seed = int(cfg.get("random_seed", synth_cfg.get("random_seed", 42)))
     synth_cfg["random_seed"] = seed
@@ -61,8 +66,12 @@ def run_synthetic_workflow(config_path: str | Path) -> dict[str, Any]:
     data.latent_states.to_csv(paths["latent_states"])
     data.codebook.to_csv(paths["codebook"], index=False)
     state_cols = [f"state_{i}" for i in range(model.n_states)]
-    pd.DataFrame(result.posterior, index=data.observations.index, columns=state_cols).to_csv(paths["posterior"])
-    pd.DataFrame(result.filtered, index=data.observations.index, columns=state_cols).to_csv(paths["filtered"])
+    pd.DataFrame(result.posterior, index=data.observations.index, columns=state_cols).to_csv(
+        paths["posterior"]
+    )
+    pd.DataFrame(result.filtered, index=data.observations.index, columns=state_cols).to_csv(
+        paths["filtered"]
+    )
     pd.Series(result.viterbi_path, index=data.observations.index, name="viterbi_state").to_csv(
         paths["viterbi_path"]
     )
@@ -73,9 +82,19 @@ def run_synthetic_workflow(config_path: str | Path) -> dict[str, Any]:
     ).to_csv(paths["transition_matrix"])
     pd.Series(metrics.values(), index=metrics.keys(), name="value").to_csv(paths["metrics"])
     files = {name: str(path) for name, path in paths.items()}
+    artifact_paths = [path for name, path in paths.items() if name != "run_metadata"]
+    lineage = build_lineage_manifest(
+        run_id=str(data.metadata.get("random_seed", seed)),
+        artifact_paths=artifact_paths,
+        metadata={"config_path": str(config_path), "deterministic": True},
+    )
+    version_id = model_version_id(lineage)
     metadata = {
         **data.metadata,
         "model": model_cfg,
+        "model_version": version_id,
+        "lineage": lineage.as_dict(),
+        "config_validation": config_report.as_dict(),
         "outputs": files,
         "warning": WORKFLOW_WARNING,
     }

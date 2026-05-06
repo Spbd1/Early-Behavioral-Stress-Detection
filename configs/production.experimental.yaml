@@ -1,0 +1,39 @@
+# Experimental production configuration: safe defaults, deterministic by default.
+random_seed: 42
+deployment:
+  experimental: true
+  deterministic: true
+  fail_closed_on_config_error: true
+  secret_env_vars:
+    - BEHAVIORAL_STRESS_API_TOKEN
+  rollback:
+    require_previous_model_version: true
+    drift_warning_blocks_promotion: true
+data:
+  source: synthetic
+  directory: data/synthetic
+  lineage_manifest: data/synthetic/run_metadata.json
+synthetic:
+  n_steps: 240
+  n_states: 3
+  n_features: 9
+  n_covariates: 2
+  random_seed: 42
+  drift_strength: 0.02
+  include_count_features: true
+  start_date: "2018-01-01"
+  freq: "W"
+model:
+  n_states: 3
+  covariance_type: diagonal
+  forgetting_rate: 0.05
+monitoring:
+  drift_warning_delta: 0.25
+  healthcheck_interval_seconds: 30
+  alert_thresholds:
+    watch: 65
+    research_review: 85
+outputs:
+  directory: data/synthetic
+frontend:
+  static_payload: frontend/dashboard.json
