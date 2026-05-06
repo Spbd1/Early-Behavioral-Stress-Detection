@@ -1,15 +1,31 @@
-"""Langflow report/output wrapper using the pure-Python fallback runner."""
+"""Langflow report/output wrapper for the package synthetic workflow."""
 from __future__ import annotations
 
-from behavioral_stress.workflows.synthetic_workflow import run_synthetic_workflow
+from pathlib import Path
+from typing import Any
+
+from behavioral_stress.workflows.synthetic_workflow import WORKFLOW_WARNING, run_synthetic_workflow
 
 
 class ReportComponent:
-    """Generate output files and dashboard launch instructions."""
+    """Wrap report output metadata and the pure-Python fallback runner."""
 
     display_name = "Report / Output Files"
+    description = "Adds reporting guidance, or runs the package fallback workflow if requested."
 
-    def run(self, config_path: str = "configs/synthetic.yaml") -> dict:
-        result = run_synthetic_workflow(config_path)
-        result["dashboard"] = "streamlit run src/behavioral_stress/visualization/dashboard.py"
+    def run(
+        self,
+        payload: dict[str, Any] | str | Path | None = None,
+        *,
+        run_fallback: bool = False,
+    ) -> dict[str, Any]:
+        """Return report metadata, optionally delegating to ``run_synthetic_workflow``."""
+        if run_fallback or not isinstance(payload, dict):
+            config_path = payload if isinstance(payload, (str, Path)) else "configs/synthetic.yaml"
+            result = run_synthetic_workflow(config_path)
+        else:
+            result = dict(payload)
+        result["warning"] = WORKFLOW_WARNING
+        result["dashboard_command"] = "streamlit run src/behavioral_stress/visualization/dashboard.py"
+        result["fallback_command"] = "python scripts/run_synthetic_demo.py --config configs/synthetic.yaml"
         return result
