@@ -85,7 +85,13 @@ def _validate_flow(payload: dict[str, Any], flow_path: Path, component_dir: Path
         raise RuntimeError(f"Flow missing nodes: {', '.join(missing_nodes)}")
 
     edges = payload.get("edges", [])
-    missing_edges = [edge for edge in REQUIRED_EDGES if edge not in edges]
+    normalized_edges = []
+    for edge in edges:
+        if isinstance(edge, dict):
+            normalized_edges.append([edge.get("source"), edge.get("target")])
+        else:
+            normalized_edges.append(edge)
+    missing_edges = [edge for edge in REQUIRED_EDGES if edge not in normalized_edges]
     if missing_edges:
         raise RuntimeError(f"Flow missing edges: {missing_edges}")
 
