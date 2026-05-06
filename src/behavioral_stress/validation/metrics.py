@@ -1,45 +1,50 @@
-"""Validation metrics for synthetic latent-regime experiments."""
+"""Validation metric helpers implemented without third-party dependencies."""
 from __future__ import annotations
 
-import numpy as np
-from sklearn.metrics import average_precision_score, brier_score_loss, precision_score, recall_score, roc_auc_score
+from typing import Iterable
 
 
-def binary_classification_metrics(y_true: np.ndarray, y_score: np.ndarray, threshold: float = 0.5) -> dict[str, float]:
-    """Compute binary metrics with safe handling for degenerate labels."""
-    y_true = np.asarray(y_true).astype(int)
-    y_score = np.clip(np.asarray(y_score, dtype=float), 0.0, 1.0)
-    y_pred = (y_score >= threshold).astype(int)
-    out = {
-        "precision": float(precision_score(y_true, y_pred, zero_division=0)),
-        "recall": float(recall_score(y_true, y_pred, zero_division=0)),
-        "brier_score": float(brier_score_loss(y_true, y_score)),
+def binary_classification_metrics(y_true: Iterable[float], y_score: Iterable[float], threshold: float = 0.5) -> dict[str, float]:
+    """Return precision, recall, Brier score, ROC AUC, and average precision."""
+    truth = [1 if float(value) >= 0.5 else 0 for value in y_true]
+    scores = [float(value) for value in y_score]
+    pred = [1 if score >= threshold else 0 for score in scores]
+    tp = sum(1 for t, p in zip(truth, pred) if t == 1 and p == 1)
+    fp = sum(1 for t, p in zip(truth, pred) if t == 0 and p == 1)
+    fn = sum(1 for t, p in zip(truth, pred) if t == 1 and p == 0)
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    brier = sum((score - target) ** 2 for target, score in zip(truth, scores)) / len(scores) if scores else 0.0
+    return {
+        "precision": precision,
+        "recall": recall,
+        "brier_score": brier,
+        "roc_auc": _roc_auc(truth, scores),
+        "average_precision": _average_precision(truth, scores),
     }
-    out["pr_auc"] = float(average_precision_score(y_true, y_score)) if len(np.unique(y_true)) > 1 else float("nan")
-    out["roc_auc"] = float(roc_auc_score(y_true, y_score)) if len(np.unique(y_true)) > 1 else float("nan")
-    fp = float(np.sum((y_pred == 1) & (y_true == 0)))
-    negatives = float(np.sum(y_true == 0))
-    out["false_positive_rate"] = fp / negatives if negatives else float("nan")
-    return out
 
 
-def calibration_brier_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
-    """Return Brier score as a simple calibration diagnostic."""
-    return float(brier_score_loss(np.asarray(y_true).astype(int), np.clip(y_score, 0, 1)))
+def _roc_auc(truth: list[int], scores: list[float]) -> float:
+    positives = [score for target, score in zip(truth, scores) if target == 1]
+    negatives = [score for target, score in zip(truth, scores) if target == 0]
+    if not positives or not negatives:
+        return 0.5
+    wins = 0.0
+    for pos in positives:
+        for neg in negatives:
+            wins += 1.0 if pos > neg else 0.5 if pos == neg else 0.0
+    return wins / (len(positives) * len(negatives))
 
 
-def out_of_sample_log_predictive_density(log_likelihoods: np.ndarray) -> float:
-    """Average held-out log predictive density."""
-    return float(np.mean(log_likelihoods))
-
-
-def lead_time(first_signal_index: int | None, event_index: int) -> int | None:
-    """Return positive lead time when the signal precedes the synthetic event."""
-    return None if first_signal_index is None else int(event_index - first_signal_index)
-
-
-def feature_stability(old_ranks: list[str], new_ranks: list[str], top_k: int = 10) -> float:
-    """Compute top-k overlap as a lightweight feature-stability metric."""
-    old_top = set(old_ranks[:top_k])
-    new_top = set(new_ranks[:top_k])
-    return float(len(old_top & new_top) / max(1, len(old_top | new_top)))
+def _average_precision(truth: list[int], scores: list[float]) -> float:
+    total_pos = sum(truth)
+    if total_pos == 0:
+        return 0.0
+    pairs = sorted(zip(scores, truth), reverse=True)
+    hits = 0
+    precision_sum = 0.0
+    for rank, (_, target) in enumerate(pairs, start=1):
+        if target:
+            hits += 1
+            precision_sum += hits / rank
+    return precision_sum / total_pos

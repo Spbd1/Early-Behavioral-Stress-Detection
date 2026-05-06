@@ -1,0 +1,1 @@
+"""Minimal statsmodels compatibility namespace."""

@@ -5,18 +5,17 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
 from behavioral_stress.data.preprocessing import standardize_frame, winsorize_frame
 from behavioral_stress.data.synthetic import generate_synthetic_regime_data
 from behavioral_stress.models.adaptive_hmm import AdaptiveHMM
 from behavioral_stress.ontology.ontology import validate_codebook
+from behavioral_stress.simple_frame import DataFrame, Series
 from behavioral_stress.utils.config import load_config
 from behavioral_stress.validation.synthetic_validation import evaluate_stress_probability
 
 
 def run_synthetic_workflow(config_path: str | Path) -> dict[str, Any]:
-    """Run config → synthetic data → preprocessing → ontology → AdaptiveHMM → metrics → files."""
+    """Run config → data → preprocessing → ontology → AdaptiveHMM → metrics → output files."""
     cfg = load_config(config_path)
     synth_cfg = dict(cfg.get("synthetic", {}))
     seed = int(cfg.get("random_seed", synth_cfg.get("random_seed", 42)))
@@ -54,11 +53,16 @@ def run_synthetic_workflow(config_path: str | Path) -> dict[str, Any]:
     data.covariates.to_csv(paths["covariates"])
     data.latent_states.to_csv(paths["latent_states"])
     data.codebook.to_csv(paths["codebook"], index=False)
-    pd.DataFrame(result.posterior, index=data.observations.index, columns=[f"state_{i}" for i in range(model.n_states)]).to_csv(paths["posterior"])
-    pd.DataFrame(result.filtered, index=data.observations.index, columns=[f"state_{i}" for i in range(model.n_states)]).to_csv(paths["filtered"])
-    pd.Series(result.viterbi_path, index=data.observations.index, name="viterbi_state").to_csv(paths["viterbi_path"])
-    pd.DataFrame(model.transition_matrix_, columns=[f"to_{i}" for i in range(model.n_states)], index=[f"from_{i}" for i in range(model.n_states)]).to_csv(paths["transition_matrix"])
-    pd.Series(metrics, name="value").to_csv(paths["metrics"])
+    state_cols = [f"state_{i}" for i in range(model.n_states)]
+    DataFrame(result.posterior, index=data.observations.index, columns=state_cols).to_csv(paths["posterior"])
+    DataFrame(result.filtered, index=data.observations.index, columns=state_cols).to_csv(paths["filtered"])
+    Series(result.viterbi_path, index=data.observations.index, name="viterbi_state").to_csv(paths["viterbi_path"])
+    DataFrame(
+        model.transition_matrix_,
+        columns=[f"to_{i}" for i in range(model.n_states)],
+        index=[f"from_{i}" for i in range(model.n_states)],
+    ).to_csv(paths["transition_matrix"])
+    Series(metrics.values(), index=metrics.keys(), name="value").to_csv(paths["metrics"])
     metadata = {**data.metadata, "model": model_cfg, "outputs": {k: str(v) for k, v in paths.items()}}
     paths["run_metadata"].write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     return {"output_dir": str(out_dir), "paths": {k: str(v) for k, v in paths.items()}, "metrics": metrics}
