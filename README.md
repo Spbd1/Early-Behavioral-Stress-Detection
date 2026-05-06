@@ -202,3 +202,43 @@ If this prototype supports a paper or preprint, cite the forthcoming manuscript 
 ## Contributing
 
 Please keep language cautious, preserve the synthetic-data default, add tests for new behavior, and avoid claims of reliable recession prediction, individual diagnosis, or policy prescription.
+
+## Experimental production hardening and browser UI
+
+The repository includes a Chrome-friendly browser dashboard plus an operational hardening layer for **experimental** deployments. These controls improve repeatability and observability, but they do not validate predictive power.
+
+### Browser dashboard
+
+API-backed mode:
+
+```bash
+python scripts/run_synthetic_demo.py --config configs/production.experimental.yaml
+python scripts/build_frontend_data.py --config configs/production.experimental.yaml
+behavioral-stress-dashboard --host 127.0.0.1 --port 8080 --config configs/production.experimental.yaml
+```
+
+Open Chrome at `http://127.0.0.1:8080`.
+
+Static mode:
+
+```bash
+python scripts/build_frontend_data.py --config configs/production.experimental.yaml --output frontend/dashboard.json
+python -m http.server 8080 --directory frontend
+```
+
+The UI supports country, region/province/state, city/metro, time-range, and keyword-family filters; BSI and HMM posterior charts; alert timeline; top contributing signals; geo comparison table/map placeholder; report viewer; data-quality warnings; drift warnings; and report export. It is intentionally labeled as experimental and avoids claims of recession prediction.
+
+### Operations docs
+
+- Production hardening guide: `docs/production_hardening.md`
+- Deployment runbook: `docs/operations/deployment.md`
+- Operational playbooks: `docs/operations/playbooks.md`
+- Troubleshooting guide: `docs/operations/troubleshooting.md`
+- Reproducibility guide: `docs/reproducibility/reproducibility_guide.md`
+
+### Health and validation
+
+```bash
+python scripts/healthcheck.py
+pytest tests/test_ops_hardening.py tests/test_data_validation_suite.py tests/test_frontend_static.py
+```

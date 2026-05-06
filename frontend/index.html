@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Experimental Behavioral Stress Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="banner">
+    <div>
+      <p class="eyebrow">Experimental system</p>
+      <h1>Behavioral Stress Regime Dashboard</h1>
+      <p id="experiment-label">This dashboard is for synthetic validation and analyst review only.</p>
+    </div>
+    <button id="export-report">Export report</button>
+  </header>
+
+  <main class="layout">
+    <aside class="panel filters" aria-label="Dashboard filters">
+      <h2>Filters</h2>
+      <label>Country<select id="country"></select></label>
+      <label>Region / province / state<select id="region"></select></label>
+      <label>City / metro<select id="city"></select></label>
+      <label>Time range<select id="time-range"><option value="all">All available</option><option value="52">Last 52 points</option><option value="26">Last 26 points</option></select></label>
+      <fieldset>
+        <legend>Keyword families</legend>
+        <label><input type="checkbox" value="labor" checked /> Labor stress</label>
+        <label><input type="checkbox" value="credit" checked /> Credit stress</label>
+        <label><input type="checkbox" value="housing" checked /> Housing stress</label>
+        <label><input type="checkbox" value="benefits" checked /> Benefits and aid</label>
+      </fieldset>
+      <p class="disclaimer">Not a validated recession predictor. Do not use for automated policy, lending, employment, or individual decisions.</p>
+    </aside>
+
+    <section class="content">
+      <div class="grid two">
+        <section class="panel"><h2>Behavioral Stress Index</h2><canvas id="bsi-chart" height="220"></canvas></section>
+        <section class="panel"><h2>HMM posterior probabilities</h2><canvas id="posterior-chart" height="220"></canvas></section>
+      </div>
+      <div class="grid three">
+        <section class="panel"><h2>Alert timeline</h2><ol id="alerts" class="timeline"></ol></section>
+        <section class="panel"><h2>Top contributing signals</h2><table id="signals"></table></section>
+        <section class="panel"><h2>Data quality warnings</h2><ul id="quality"></ul><h3>Drift warnings</h3><ul id="drift"></ul></section>
+      </div>
+      <div class="grid two">
+        <section class="panel"><h2>Geo comparison map/table</h2><div id="geo-map" class="map-placeholder"></div><table id="geo-table"></table></section>
+        <section class="panel"><h2>Report viewer</h2><pre id="report"></pre></section>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -151,3 +151,21 @@ Current overall status: **not production-ready**. Most production gates are `[ ]
 ## Launch decision rule
 
 The platform should remain **internal research/shadow mode** until Gates 1 through 9 are complete for at least one target geography and signal set, and Gates 10 through 12 have production-equivalent controls. External-facing reports or alerts should require explicit human review until there is a documented operating history with acceptable false-alarm, missed-event, freshness, and drift performance.
+
+## Experimental production/frontend hardening update
+
+Completed additions for experimental production usage:
+
+- Docker runtime hardening with non-root execution, healthcheck command, dashboard service, and `.dockerignore`.
+- Runtime environment/config validation, deterministic seed enforcement, structured JSON logging, monitoring hooks, data lineage manifests, and derived model-version IDs.
+- CI workflow for install, health checks, tests, deterministic synthetic smoke run, frontend payload generation, and Docker build.
+- Chrome-friendly browser dashboard with conservative experimental labels, location/time/keyword filters, BSI chart, HMM posterior chart, alert timeline, top signals, geo comparison, report viewer, warnings, and export.
+- Validation guardrails for schema checks, temporal leakage detection, geo-data validation, alert backtesting, and report snapshots.
+- Deployment docs, operational playbooks, troubleshooting guide, reproducibility guide, and explicit reliability/production-safety risk register.
+
+Remaining roadmap items:
+
+- Prospective real-world validation with strict point-in-time data contracts.
+- Formal model-risk review, privacy/legal review, and incident response ownership before any non-research deployment.
+- Orchestrator-enforced rollback automation and monitored production telemetry integrations.
+- Stronger statistical drift tests, calibrated alert thresholds, and independent audit of geographic comparability.
