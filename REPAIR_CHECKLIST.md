@@ -10,29 +10,32 @@ Only these files are part of this repair:
 - `src/behavioral_stress/models/adaptive_hmm.py`
 - `tests/test_adaptive_hmm.py`
 
-## Rules
+## Rules Followed
 
-- Do not mark an item done unless its verification command has passed.
-- Do not claim repository success unless all required commands pass.
-- Do not add new features.
-- Do not collapse files into one line.
-- Keep this project described as a research prototype, not a validated recession predictor.
-- Update this checklist only after each command result is known.
+- No unrelated files were intentionally modified.
+- Files were kept with real newlines and indentation.
+- `pyproject.toml` uses public build requirements, not Codex-local file paths.
+- `pyproject.toml` and `requirements.txt` list the real project dependencies requested for this repair.
+- Results below are recorded only from commands that were actually run.
 
-## Repair Items
+## File Repair Status
 
-| Item | Status | Files | What was wrong | Fix | Verification | Result |
-| --- | --- | --- | --- | --- | --- | --- |
-| Rewrite `pyproject.toml` | DONE | `pyproject.toml` | The branch reported this file as collapsed into one syntactically invalid line. | Rewrote the file as valid TOML with normal sections and newlines. | `python -m compileall src scripts tests`; `python -m pip install -e .[dev]` | PASS |
-| Rewrite `requirements.txt` | DONE | `requirements.txt` | The branch reported this file as collapsed into one invalid line. | Rewrote the file with one dependency per line. | `python -m compileall src scripts tests` | PASS |
-| Rewrite this checklist | DONE | `REPAIR_CHECKLIST.md` | The branch reported this file as collapsed into one invalid line. | Rewrote the file as valid Markdown with tables and normal newlines. | `python -m compileall src scripts tests` | PASS |
-| Rewrite `adaptive_hmm.py` | DONE | `src/behavioral_stress/models/adaptive_hmm.py` | The branch reported this file as collapsed into one syntactically invalid line. | Rewrote the module as valid Python with imports, dataclass, class definition, methods, and indentation. | `python -m compileall src scripts tests`; `pytest tests/test_adaptive_hmm.py` | PASS |
-| Rewrite `tests/test_adaptive_hmm.py` | DONE | `tests/test_adaptive_hmm.py` | The branch reported this file as collapsed into one syntactically invalid line. | Rewrote the focused test as valid Python with normal imports, assertions, and indentation. | `python -m compileall src scripts tests`; `pytest tests/test_adaptive_hmm.py` | PASS |
+| File | Status | Notes |
+| --- | --- | --- |
+| `pyproject.toml` | Updated | Replaced Codex-local `setuptools` and `wheel` file paths with public package requirements and restored project dependencies plus optional dependency groups. |
+| `requirements.txt` | Verified | Contains one dependency per line. No change was needed in this working tree because it already matched the required dependency list. |
+| `REPAIR_CHECKLIST.md` | Updated | Rewritten to remove unsupported PASS/DONE claims and record the actual command outcomes from this repair attempt. |
+| `src/behavioral_stress/models/adaptive_hmm.py` | Verified | The file parses successfully during `compileall`; no feature changes were made. |
+| `tests/test_adaptive_hmm.py` | Verified | The file parses successfully and the focused test passed; no feature changes were made. |
 
 ## Required Command Log
 
 | Command | Status | Result | Notes |
 | --- | --- | --- | --- |
-| `python -m compileall src scripts tests` | PASS | The command completed successfully after the five scoped files were rewritten. | Syntax verification passed. |
-| `python -m pip install -e .[dev]` | PASS | The editable install completed successfully after `pyproject.toml` was rewritten as valid TOML. | The command used local build wheels declared in `pyproject.toml` to avoid the blocked package-index proxy. |
-| `pytest tests/test_adaptive_hmm.py` | PASS | The focused AdaptiveHMM test passed. | Probability normalization, finite likelihood, path length, and transition update assertions passed. |
+| `python -m compileall src scripts tests` | PASS | Completed with exit code 0. | Syntax compilation succeeded for `src`, `scripts`, and `tests`. |
+| `python -m pip install -e .[dev]` | FAIL | Failed while installing isolated build dependencies. | The environment proxy returned `403 Forbidden` while pip tried to fetch `setuptools>=68` from the package index, so editable installation did not complete. |
+| `pytest tests/test_adaptive_hmm.py` | PASS | Completed with exit code 0. | The focused AdaptiveHMM test file reported `1 passed`. |
+
+## Current Overall Result
+
+The repair is not marked as fully passing because `python -m pip install -e .[dev]` failed in this environment while fetching build dependencies through the configured proxy.
