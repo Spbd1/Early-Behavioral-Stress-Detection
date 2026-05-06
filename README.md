@@ -86,6 +86,63 @@ python scripts/export_langflow_demo.py
 
 Then import `langflow/behavioral_stress_flow.json` and add custom components from `langflow/custom_components/`. See `langflow/README.md` for details. The pure-Python fallback runner is `behavioral_stress.workflows.synthetic_workflow.run_synthetic_workflow`.
 
+
+## Google Trends ingestion
+
+This repository now includes a reusable Google Trends ingestion layer for aggregate,
+keyword-level `interest_over_time` data. Install the optional connector dependency before live
+collection:
+
+```bash
+pip install -e .[ingestion]
+```
+
+Run the sample pipeline with either entry point:
+
+```bash
+behavioral-stress-ingest google-trends --config configs/ingestion/google_trends_sample.yaml
+python scripts/run_google_trends_ingestion.py --config configs/ingestion/google_trends_sample.yaml
+```
+
+The ingestion architecture intentionally separates provider coupling from durable artifacts:
+
+- `behavioral_stress.ingestion.config` loads typed YAML settings for keywords, regions,
+  historical windows, retries, rate limits, cache TTLs, storage locations, and quality gates.
+- `behavioral_stress.ingestion.cache.FileCache` stores content-addressed CSV/JSON cache entries
+  by request hash so replayed batches do not repeatedly hit Google Trends.
+- `behavioral_stress.ingestion.trends.GoogleTrendsIngestionPipeline` orchestrates historical and
+  incremental pulls, regional loops, keyword batching, retry/backoff, rate limiting, raw batch
+  writes, processed panel generation, and run metadata.
+- `behavioral_stress.ingestion.trends.PytrendsClient` is the default live connector, while tests
+  can pass any object that implements the small `TrendsClient` protocol.
+- `behavioral_stress.ingestion.logging` emits JSON logs for batch status, cache hits, retry
+  attempts, and run IDs.
+
+Raw provider responses are written under `data/raw/google_trends`, processed long-format panels
+under `data/processed/google_trends`, and run metadata under `data/metadata/google_trends` by
+default. Processed rows contain `date`, `keyword`, `value_raw`, `value_normalized`,
+`anchor_value`, `region`, and `timeframe`.
+
+### Ingestion tradeoffs and limitations
+
+Google Trends data is sampled and scaled by Google rather than reported as absolute query volume.
+Values are relative to the requested keyword set, region, and time window; low-volume terms may be
+rounded to zero or omitted; repeated pulls can change; long windows may be returned at coarser
+resolution; and Google can throttle, block, or alter unofficial access behavior. The pipeline
+therefore treats Google Trends as a noisy aggregate research signal, not a stable measurement
+system.
+
+The connector uses pytrends because it is widely used and lightweight, but it is unofficial and can
+break when Google changes web behavior. The `TrendsClient` protocol keeps this replaceable by a
+commercial or internal provider if reliability, legal review, or support requirements change.
+
+Normalization consistency is mitigated by forcing batches to include an anchor keyword whenever one
+is configured. Non-anchor series are scaled relative to the anchor within each batch, and metadata
+records anchor values and validation issues. This reduces—but does not eliminate—cross-batch drift,
+because the anchor itself is still a Google-rescaled sampled series. Additional mitigation comes
+from cache-backed replay, overlap-based incremental updates, raw artifact retention, and explicit
+quality flags for sparse, missing, nonpositive-anchor, or high-variation anchor batches.
+
 ## Docker
 
 From the repository root:

@@ -1,0 +1,41 @@
+google_trends:
+  keywords:
+    - unemployment benefits
+    - food bank
+    - debt relief
+    - eviction help
+    - job openings
+  anchor_keyword: unemployment benefits
+  regions:
+    - ""
+    - US
+  timeframe: today 5-y
+  historical_timeframes:
+    - 2018-01-01 2020-12-31
+    - 2021-01-01 2023-12-31
+  category: 0
+  gprop: ""
+  batch_size: 5
+  incremental: true
+  overlap_days: 21
+  language: en-US
+  timezone: 0
+  storage:
+    raw_directory: data/raw/google_trends
+    processed_directory: data/processed/google_trends
+    metadata_directory: data/metadata/google_trends
+  cache:
+    directory: data/cache/google_trends
+    ttl_seconds: 86400
+    enabled: true
+  retry:
+    max_attempts: 4
+    backoff_seconds: 2.0
+    backoff_multiplier: 2.0
+  rate_limit:
+    requests_per_minute: 10
+  validation:
+    max_missing_fraction: 0.15
+    min_nonzero_fraction: 0.25
+    max_batch_anchor_cv: 0.5
+    require_complete_anchor: true

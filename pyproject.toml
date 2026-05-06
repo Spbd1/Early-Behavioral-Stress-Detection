@@ -44,10 +44,16 @@ dependencies = [
     "streamlit",
 ]
 
+[project.scripts]
+behavioral-stress-ingest = "behavioral_stress.ingestion.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest",
     "ruff",
+]
+ingestion = [
+    "pytrends",
 ]
 langflow = [
     "langflow",
