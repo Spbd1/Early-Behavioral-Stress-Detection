@@ -86,6 +86,19 @@ python scripts/export_langflow_demo.py
 
 Then import `langflow/behavioral_stress_flow.json` and add custom components from `langflow/custom_components/`. See `langflow/README.md` for details. The pure-Python fallback runner is `behavioral_stress.workflows.synthetic_workflow.run_synthetic_workflow`.
 
+## Ontology-guided keyword generation
+
+The repository includes a local-first, ontology-guided keyword workflow for maintaining
+behavioral stress monitoring terms by country, state/province/region, city, or metro. The
+workflow combines a controlled keyword ontology, a lightweight local RAG retriever, reviewable
+keyword candidates, geo metadata with stable codes where possible, human approval gates,
+deduplication, semantic grouping, version history, retirement, and drift-review flags.
+
+The local RAG layer reads project-owned snippets from `data/knowledge_base/behavioral_stress_keyword_kb.jsonl`
+and is used only for explanation and grounding. It must not decide alerts or bypass reviewer
+approval. See `docs/ontology_guided_keyword_generation.md` for the schema, hallucination risks,
+mitigations, and provider-geography limitations.
+
 
 ## Google Trends ingestion
 

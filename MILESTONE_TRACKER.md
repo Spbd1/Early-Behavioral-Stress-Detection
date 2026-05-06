@@ -20,7 +20,7 @@ This tracker is initialized from `IMPLEMENTATION_PLAN.md`, `FINALIZATION_CHECKLI
 
 | ID | Milestone | Status | Blockers | Dependencies | Validation state | Technical debt notes |
 |---|---|---|---|---|---|---|
-| R1 | Governed ontology and LLM keyword workflow | Not started | LLM provider terms review, prompt governance, sensitive-term policy, and reviewer availability pending. | P0; ingestion promotion also requires P2-P3. | Not validated; ontology versioning, prompt schema, filter, review, validation, and retirement tests pending. | Static synthetic ontology/codebook exists but lacks review state and versioned promotion workflow. |
+| R1 | Governed ontology and LLM keyword workflow | Validation pending | LLM provider terms review, sensitive-term policy, reviewer staffing, and production prompt governance remain pending. | P0; ingestion promotion also requires P2-P3. | Partially validated by `tests/test_keyword_generation.py`; local ontology categories, deterministic RAG grounding, geo-aware schema, review gates, deduplication, expansion limits, versioning, retirement, unsupported-location handling, and drift-review heuristics added. | Current workflow is deterministic/local and does not call an LLM; future LLM use must persist prompts, model versions, raw outputs, and reviewer decisions before promotion. |
 | R2 | Multi-source and multi-region research panels | Not started | Additional source selection, terms review, region scope, and cost expectations pending. | P1-P3; comparative validation requires P5. | Not validated; additional connector fixture tests and multi-region snapshot validation pending. | Single-source dependence remains a critical risk until another aggregate source is integrated. |
 | R3 | Robustness, placebo, and negative-control evidence pack | Not started | Approved event catalog, feature snapshots, and statistical review rubric pending. | P5 | Not validated; robustness report, placebo, negative-control, source-outage, and sensitivity tests pending. | Causal/validation modules exist but need registry-backed evidence packaging and caveat discipline. |
 | R4 | Advanced model comparison automation | Not started | Comparable model configurations, compute budget, and model promotion criteria pending. | P4, P5 | Not validated; model comparison runner and metric-parity tests pending. | Baseline coverage is partial and comparisons are not yet registry-backed. |
@@ -45,7 +45,7 @@ This tracker is initialized from `IMPLEMENTATION_PLAN.md`, `FINALIZATION_CHECKLI
 | Decision-time backtesting | Pending | P5 | Must prove no future information is used. |
 | Calibration and threshold approval | Pending | P5 | Required before any alert milestone can proceed. |
 | Shadow-mode operational health | Pending | P6 | Must run internally with no external delivery. |
-| Human-reviewed alert auditability | Pending | P7 | Required for reviewed experimental alerts. |
+| Human-reviewed alert auditability | Partial for keyword governance only | R1/P7 | Keyword candidates now have human review states and version history; alert auditability remains pending and RAG is explicitly excluded from alert decisions. |
 | Deployment and rollback evidence | Pending | P8 | Required for controlled production operation. |
 
 ## Update protocol
