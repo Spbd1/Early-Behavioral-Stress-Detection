@@ -1,0 +1,21 @@
+{
+  "name": "Behavioral Stress Research Flow",
+  "description": "Input Config -> Data Loader -> Preprocessing -> Ontology Signal Generator -> Adaptive HMM -> Validation Metrics -> Visualization / Report",
+  "nodes": [
+    {"id": "config", "type": "Input Config"},
+    {"id": "data_loader", "type": "Synthetic or Processed Data Loader"},
+    {"id": "preprocessing", "type": "Preprocessing"},
+    {"id": "ontology", "type": "Ontology Signal Generator"},
+    {"id": "adaptive_hmm", "type": "Adaptive HMM"},
+    {"id": "metrics", "type": "Validation Metrics"},
+    {"id": "report", "type": "Visualization / Report"}
+  ],
+  "edges": [
+    ["config", "data_loader"],
+    ["data_loader", "preprocessing"],
+    ["preprocessing", "ontology"],
+    ["ontology", "adaptive_hmm"],
+    ["adaptive_hmm", "metrics"],
+    ["metrics", "report"]
+  ]
+}

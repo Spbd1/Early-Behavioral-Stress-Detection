@@ -1,0 +1,16 @@
+random_seed: 42
+validation:
+  rolling_origin:
+    initial_window: 120
+    step: 12
+    horizon: 12
+  retirement_threshold: 0.5
+synthetic:
+  n_steps: 240
+  n_states: 3
+  n_features: 9
+  n_covariates: 2
+model:
+  n_states: 3
+  covariance_type: diagonal
+  forgetting_rate: 0.05

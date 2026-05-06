@@ -1,0 +1,16 @@
+random_seed: 42
+synthetic:
+  n_steps: 240
+  n_states: 3
+  n_features: 9
+  n_covariates: 2
+  start_date: "2018-01-01"
+  frequency: "W"
+  include_counts: true
+  concept_drift: true
+model:
+  n_states: 3
+  covariance_type: diagonal
+  forgetting_rate: 0.05
+outputs:
+  directory: data/synthetic

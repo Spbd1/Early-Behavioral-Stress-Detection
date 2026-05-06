@@ -1,0 +1,11 @@
+random_seed: 42
+data:
+  source: synthetic
+  directory: data/synthetic
+model:
+  n_states: 3
+  covariance_type: diagonal
+  forgetting_rate: 0.05
+dashboard:
+  title: Behavioral Stress Regime Detection
+  banner: "Experimental research prototype. Not a validated recession predictor. Aggregate-level inference only."
