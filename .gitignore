@@ -1,0 +1,31 @@
+@'
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment files
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Generated demo outputs
+data/synthetic/*.csv
+data/synthetic/*.json
+data/synthetic/*.parquet
+'@ | Add-Content .gitignore
