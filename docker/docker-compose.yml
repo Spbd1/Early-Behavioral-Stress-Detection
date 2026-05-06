@@ -3,18 +3,25 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    profiles: ["research-demo"]
     volumes:
       - ../data:/app/data
     command: python scripts/run_synthetic_demo.py --config configs/synthetic.yaml
+
   dashboard:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    profiles: ["dashboard"]
     volumes:
       - ../data:/app/data
     ports:
       - "8501:8501"
-    command: streamlit run src/behavioral_stress/visualization/dashboard.py --server.address=0.0.0.0
+    command: >
+      sh -c "python -m pip install --no-cache-dir -e '.[dashboard]'
+      && streamlit run src/behavioral_stress/visualization/dashboard.py
+      --server.address=0.0.0.0"
+
   langflow:
     build:
       context: ..
@@ -22,4 +29,6 @@ services:
     profiles: ["langflow"]
     ports:
       - "7860:7860"
-    command: sh -c "pip install '.[langflow]' && langflow run --host 0.0.0.0"
+    command: >
+      sh -c "python -m pip install --no-cache-dir -e '.[langflow]'
+      && langflow run --host 0.0.0.0"
