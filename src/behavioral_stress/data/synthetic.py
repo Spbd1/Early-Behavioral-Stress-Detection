@@ -1,118 +1,98 @@
-"""Synthetic aggregate digital trace generator with known latent regimes."""
+"""Synthetic aggregate behavioral stress data generation."""
 from __future__ import annotations
 
 from dataclasses import dataclass
+import random
 from typing import Any
 
-import numpy as np
-import pandas as pd
-from scipy.stats import nbinom
-
 from behavioral_stress.ontology.signal_codebook import build_default_codebook
+from behavioral_stress.simple_frame import DataFrame, Series
 
 
-@dataclass(frozen=True)
+@dataclass
 class SyntheticRegimeData:
-    """Container for synthetic observations, covariates, latent states, and metadata."""
+    """Container for generated observations, covariates, latent states, and metadata."""
 
-    observations: pd.DataFrame
-    covariates: pd.DataFrame
-    latent_states: pd.Series
-    codebook: pd.DataFrame
+    observations: DataFrame
+    covariates: DataFrame
+    latent_states: Series
+    codebook: DataFrame
     metadata: dict[str, Any]
 
 
-def _default_transition_matrix(n_states: int) -> np.ndarray:
-    matrix = np.full((n_states, n_states), 0.05 / max(n_states - 1, 1), dtype=float)
-    np.fill_diagonal(matrix, 0.95)
-    if n_states == 3:
-        matrix = np.array([[0.92, 0.07, 0.01], [0.08, 0.84, 0.08], [0.03, 0.12, 0.85]])
-    matrix /= matrix.sum(axis=1, keepdims=True)
-    return matrix
-
-
-def _simulate_states(rng: np.random.Generator, n_steps: int, transition: np.ndarray) -> np.ndarray:
-    states = np.zeros(n_steps, dtype=int)
-    for t in range(1, n_steps):
-        states[t] = rng.choice(transition.shape[0], p=transition[states[t - 1]])
-    return states
-
-
 def generate_synthetic_regime_data(
-    n_steps: int = 300,
+    n_steps: int = 240,
     n_states: int = 3,
     n_features: int = 9,
     n_covariates: int = 2,
     random_seed: int = 42,
     drift_strength: float = 0.02,
     include_count_features: bool = True,
-    start_date: str = "2020-01-01",
-    freq: str = "D",
+    start_date: str = "2018-01-01",
+    freq: str = "W",
 ) -> SyntheticRegimeData:
-    """Generate aggregate synthetic traces with known latent regimes.
+    """Generate a deterministic aggregate latent-regime toy data set."""
+    rng = random.Random(random_seed)
+    transition = _transition_matrix(n_states)
+    states = [0]
+    for _ in range(1, n_steps):
+        states.append(_sample_categorical(rng, transition[states[-1]]))
 
-    Regime separation is intentionally moderate: signals contain shared shocks, seasonality, drift,
-    and observation noise so synthetic validation is informative but not unrealistically perfect.
-    """
-    if n_steps < 5:
-        raise ValueError("n_steps must be at least 5")
-    if n_states < 2:
-        raise ValueError("n_states must be at least 2")
-    if n_features < 1:
-        raise ValueError("n_features must be positive")
+    index = [f"t_{step:04d}" for step in range(n_steps)]
+    observations: list[list[float]] = []
+    covariates: list[list[float]] = []
+    for step, state in enumerate(states):
+        seasonal = 0.25 * _sin(step / 8.0)
+        drift = drift_strength * step
+        covariates.append([round(seasonal + rng.gauss(0.0, 0.15), 6) for _ in range(n_covariates)])
+        row: list[float] = []
+        for feature in range(n_features):
+            direction = -1.0 if feature % 3 in {0, 1} else 1.0
+            mean = 10.0 + direction * state * 1.7 + seasonal + drift * (feature + 1) / n_features
+            value = mean + rng.gauss(0.0, 0.8 + 0.15 * state)
+            if include_count_features and feature % 4 == 3:
+                value = max(0.0, round(value))
+            row.append(round(value, 6))
+        observations.append(row)
 
-    rng = np.random.default_rng(random_seed)
-    index = pd.date_range(start=start_date, periods=n_steps, freq=freq)
-    transition = _default_transition_matrix(n_states)
-    states = _simulate_states(rng, n_steps, transition)
-
-    time = np.arange(n_steps)
-    covariates = pd.DataFrame(index=index)
-    for j in range(n_covariates):
-        seasonal = np.sin(2 * np.pi * time / max(24, 52) + j)
-        covariates[f"covariate_{j + 1:02d}"] = seasonal + 0.2 * rng.normal(size=n_steps)
-
-    codebook = build_default_codebook(n_features=n_features, freq=freq)
-    observations = pd.DataFrame(index=index)
-    stress_axis = np.linspace(0.0, 1.0, n_states)
-    shared_shock = rng.normal(0, 0.35, size=n_steps)
-
-    for feature_idx in range(n_features):
-        level_idx = feature_idx % 3
-        baseline = rng.normal(0.0, 0.25)
-        loading = rng.uniform(0.7, 1.3)
-        sign = -1.0 if level_idx in {0, 1} else 1.0
-        if level_idx == 1:
-            effect = sign * loading * np.sqrt(stress_axis[states] + 0.05)
-        elif level_idx == 2:
-            effect = sign * loading * (0.35 + stress_axis[states])
-        else:
-            effect = sign * loading * stress_axis[states]
-        drift = drift_strength * (time / max(n_steps - 1, 1)) * rng.normal(0.0, 1.0)
-        cov_effect = 0.15 * covariates.sum(axis=1).to_numpy() if n_covariates else 0.0
-        noise = rng.normal(0.0, 0.65, size=n_steps)
-        values = baseline + effect + 0.25 * shared_shock + cov_effect + drift + noise
-
-        if include_count_features and codebook.loc[feature_idx, "data_type"] == "count":
-            # Overdispersed aggregate count trace with non-perfect state separation.
-            mu = np.exp(2.2 + values / 2.5)
-            r = 8.0
-            p = r / (r + mu)
-            values = nbinom(n=r, p=p).rvs(random_state=rng)
-        observations[codebook.loc[feature_idx, "signal_name"]] = values
-
-    latent_states = pd.Series(states, index=index, name="latent_state")
+    obs_cols = [f"synthetic_signal_{idx + 1:02d}" for idx in range(n_features)]
+    cov_cols = [f"covariate_{idx + 1:02d}" for idx in range(n_covariates)]
     metadata = {
         "n_steps": n_steps,
         "n_states": n_states,
         "n_features": n_features,
         "n_covariates": n_covariates,
         "random_seed": random_seed,
-        "drift_strength": drift_strength,
-        "include_count_features": include_count_features,
         "start_date": start_date,
         "freq": freq,
-        "transition_matrix": transition.tolist(),
-        "warning": "Synthetic aggregate-level latent regimes for research validation only.",
+        "warning": "Synthetic aggregate research data only; not a diagnostic or recession forecast.",
     }
-    return SyntheticRegimeData(observations, covariates, latent_states, codebook, metadata)
+    return SyntheticRegimeData(
+        observations=DataFrame(observations, columns=obs_cols, index=index),
+        covariates=DataFrame(covariates, columns=cov_cols, index=index),
+        latent_states=Series(states, index=index, name="latent_state"),
+        codebook=build_default_codebook(n_features=n_features, freq=freq),
+        metadata=metadata,
+    )
+
+
+def _transition_matrix(n_states: int) -> list[list[float]]:
+    stay = 0.86
+    move = (1.0 - stay) / max(1, n_states - 1)
+    return [[stay if i == j else move for j in range(n_states)] for i in range(n_states)]
+
+
+def _sample_categorical(rng: random.Random, probs: list[float]) -> int:
+    draw = rng.random()
+    total = 0.0
+    for idx, prob in enumerate(probs):
+        total += prob
+        if draw <= total:
+            return idx
+    return len(probs) - 1
+
+
+def _sin(value: float) -> float:
+    import math
+
+    return math.sin(value)

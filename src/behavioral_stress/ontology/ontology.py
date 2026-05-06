@@ -1,8 +1,4 @@
-"""Behavioral signal ontology definitions for aggregate synthetic traces.
-
-The ontology is descriptive. It does not establish causal mechanisms, individual-level stress,
-or policy prescriptions from digital traces.
-"""
+"""Behavioral signal ontology definitions for aggregate synthetic traces."""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
@@ -10,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
+from behavioral_stress.simple_frame import DataFrame
 import yaml
 
 REQUIRED_CODEBOOK_COLUMNS = [
@@ -55,9 +51,9 @@ class BehavioralOntology:
     def __init__(self, signals: list[BehavioralSignal]) -> None:
         self.signals = signals
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return ontology signals as a codebook DataFrame."""
-        return pd.DataFrame([signal.to_dict() for signal in self.signals])
+    def to_dataframe(self) -> DataFrame:
+        """Return ontology signals as a codebook table."""
+        return DataFrame([signal.to_dict() for signal in self.signals])
 
     def to_dict(self) -> dict[str, Any]:
         """Return dictionary payload for serialization."""
@@ -65,7 +61,7 @@ class BehavioralOntology:
 
     def to_yaml(self, path: str | Path) -> None:
         """Export the ontology to YAML."""
-        Path(path).write_text(yaml.safe_dump(self.to_dict(), sort_keys=False), encoding="utf-8")
+        Path(path).write_text(yaml.safe_dump(self.to_dict()), encoding="utf-8")
 
     def to_json(self, path: str | Path) -> None:
         """Export the ontology to JSON."""
@@ -117,7 +113,7 @@ def default_ontology(n_features: int = 9, freq: str = "D") -> BehavioralOntology
     return BehavioralOntology(signals)
 
 
-def validate_codebook(codebook: pd.DataFrame) -> bool:
+def validate_codebook(codebook: DataFrame) -> bool:
     """Validate that a codebook contains required columns and valid ontology levels."""
     missing = [column for column in REQUIRED_CODEBOOK_COLUMNS if column not in codebook.columns]
     if missing:

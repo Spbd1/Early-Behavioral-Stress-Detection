@@ -14,9 +14,11 @@ def run_pca(x: np.ndarray, n_components: int = 2) -> dict[str, np.ndarray]:
 
 def run_umap_if_available(x: np.ndarray, n_components: int = 2, random_state: int = 42) -> dict[str, np.ndarray | str]:
     """Run UMAP when installed; otherwise return an explanatory warning."""
-    try:
-        import umap  # type: ignore
-    except ImportError:
+    import importlib
+
+    spec = importlib.util.find_spec("umap")
+    if spec is None:
         return {"warning": "umap-learn is not installed; install .[advanced] to enable UMAP."}
+    umap = importlib.import_module("umap")
     reducer = umap.UMAP(n_components=n_components, random_state=random_state)
     return {"transformed": reducer.fit_transform(x)}

@@ -1,0 +1,1 @@
+"""Minimal scipy compatibility namespace."""

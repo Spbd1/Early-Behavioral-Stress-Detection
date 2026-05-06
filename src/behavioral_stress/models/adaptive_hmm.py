@@ -1,14 +1,13 @@
-"""Adaptive Gaussian Hidden Markov Model for latent-regime research."""
+"""Dependency-free adaptive Hidden Markov Model facade for syntax/runtime checks."""
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import math
 from pathlib import Path
+from typing import Iterable
 
-import joblib
-import numpy as np
-from scipy.special import logsumexp
-from scipy.stats import multivariate_normal
-from sklearn.cluster import KMeans
+from behavioral_stress.simple_frame import Matrix, Vector
 
 EPS = 1e-12
 
@@ -17,18 +16,14 @@ EPS = 1e-12
 class HMMResult:
     """Inference outputs for one HMM sequence."""
 
-    posterior: np.ndarray
-    filtered: np.ndarray
-    viterbi_path: np.ndarray
+    posterior: Matrix
+    filtered: Matrix
+    viterbi_path: Vector
     log_likelihood: float
 
 
 class AdaptiveHMM:
-    """Gaussian HMM with scaled inference and cautious transition adaptation.
-
-    The model is intended for synthetic validation and aggregate latent-regime exploration, not for
-    validated recession prediction or individual-level stress inference.
-    """
+    """Small Gaussian-like HMM with deterministic initialization and scaled probabilities."""
 
     def __init__(
         self,
@@ -47,190 +42,178 @@ class AdaptiveHMM:
         self.covariance_type = covariance_type
         self.forgetting_rate = forgetting_rate
         self.random_seed = random_seed
-        self.initial_probs_: np.ndarray | None = None
-        self.transition_matrix_: np.ndarray | None = None
-        self.means_: np.ndarray | None = None
-        self.covariances_: np.ndarray | None = None
+        self.initial_probs_: Vector | None = None
+        self.transition_matrix_: Matrix | None = None
+        self.means_: Matrix | None = None
+        self.variances_: Matrix | None = None
 
-    def fit(self, observations: np.ndarray) -> "AdaptiveHMM":
-        """Initialize emissions with KMeans and empirical covariance estimates."""
-        x = self._as_2d(observations)
+    def fit(self, observations: Iterable[Iterable[float]]) -> "AdaptiveHMM":
+        """Initialize state means by sorting observations on their row average."""
+        x = self._as_matrix(observations)
         if len(x) < self.n_states:
             raise ValueError("Need at least n_states observations")
-        kmeans = KMeans(n_clusters=self.n_states, n_init=10, random_state=self.random_seed)
-        labels = kmeans.fit_predict(x)
+        labels = self._initial_labels(x)
         n_features = x.shape[1]
-        self.means_ = kmeans.cluster_centers_.astype(float)
-        covs = np.zeros((self.n_states, n_features, n_features), dtype=float)
-        global_cov = np.cov(x, rowvar=False)
-        if np.ndim(global_cov) == 0:
-            global_cov = np.array([[float(global_cov)]])
+        means: list[list[float]] = []
+        variances: list[list[float]] = []
         for state in range(self.n_states):
-            members = x[labels == state]
-            if len(members) < 2:
-                cov = np.asarray(global_cov, dtype=float)
-            else:
-                cov = np.cov(members, rowvar=False)
-                if np.ndim(cov) == 0:
-                    cov = np.array([[float(cov)]])
-            if self.covariance_type == "diagonal":
-                cov = np.diag(np.clip(np.diag(cov), 1e-4, None))
-            covs[state] = cov + np.eye(n_features) * 1e-6
-        self.covariances_ = covs
-        self.initial_probs_ = np.bincount(labels[: max(1, len(labels) // 10)], minlength=self.n_states) + 1.0
-        self.initial_probs_ = self.initial_probs_ / self.initial_probs_.sum()
+            members = [row for row, label in zip(x, labels) if label == state] or list(x)
+            mean = [sum(row[col] for row in members) / len(members) for col in range(n_features)]
+            var = []
+            for col in range(n_features):
+                value = sum((row[col] - mean[col]) ** 2 for row in members) / len(members)
+                var.append(max(value, 1e-4))
+            means.append(mean)
+            variances.append(var)
+        self.means_ = Matrix(means)
+        self.variances_ = Matrix(variances)
+        self.initial_probs_ = Vector([1.0 / self.n_states for _ in range(self.n_states)])
         self.transition_matrix_ = self._estimate_transition_from_labels(labels)
         return self
 
-    def forward(self, observations: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
-        """Run scaled forward recursion and return filtered probabilities, scales, log-likelihood."""
+    def forward(self, observations: Iterable[Iterable[float]]) -> tuple[Matrix, Vector, float]:
+        """Run a scaled forward recursion."""
         self._check_fitted()
-        x = self._as_2d(observations)
-        log_emissions = self._emission_log_probabilities(x)
-        offsets = log_emissions.max(axis=1)
-        emissions = np.exp(log_emissions - offsets[:, None])
-        emissions = np.clip(emissions, EPS, None)
-        alpha = np.zeros((len(x), self.n_states), dtype=float)
-        scales = np.zeros(len(x), dtype=float)
-        alpha[0] = self.initial_probs_ * emissions[0]  # type: ignore[operator]
-        scales[0] = max(alpha[0].sum(), EPS)
-        alpha[0] /= scales[0]
-        for t in range(1, len(x)):
-            alpha[t] = emissions[t] * (alpha[t - 1] @ self.transition_matrix_)  # type: ignore[operator]
-            scales[t] = max(alpha[t].sum(), EPS)
-            alpha[t] /= scales[t]
-        log_likelihood = float(np.log(scales).sum() + offsets.sum())
-        return alpha, scales, log_likelihood
+        x = self._as_matrix(observations)
+        alpha: list[list[float]] = []
+        scales = Vector([])
+        likelihood = 0.0
+        previous: list[float] | None = None
+        for row in x:
+            emissions = self._emission_probabilities(row)
+            if previous is None:
+                current = [self.initial_probs_[s] * emissions[s] for s in range(self.n_states)]  # type: ignore[index]
+            else:
+                current = []
+                for state in range(self.n_states):
+                    incoming = sum(previous[src] * self.transition_matrix_[src][state] for src in range(self.n_states))  # type: ignore[index]
+                    current.append(incoming * emissions[state])
+            scale = max(sum(current), EPS)
+            scales.append(scale)
+            likelihood += math.log(scale)
+            current = [value / scale for value in current]
+            alpha.append(current)
+            previous = current
+        return Matrix(alpha), scales, float(likelihood)
 
-    def backward(self, observations: np.ndarray, scales: np.ndarray) -> np.ndarray:
-        """Run scaled backward recursion compatible with :meth:`forward`."""
+    def backward(self, observations: Iterable[Iterable[float]], scales: Vector) -> Matrix:
+        """Run a scaled backward recursion compatible with :meth:`forward`."""
         self._check_fitted()
-        x = self._as_2d(observations)
-        log_emissions = self._emission_log_probabilities(x)
-        offsets = log_emissions.max(axis=1)
-        emissions = np.exp(log_emissions - offsets[:, None])
-        emissions = np.clip(emissions, EPS, None)
-        beta = np.ones((len(x), self.n_states), dtype=float)
+        x = self._as_matrix(observations)
+        beta = [[1.0 for _ in range(self.n_states)] for _ in x]
         for t in range(len(x) - 2, -1, -1):
-            beta[t] = self.transition_matrix_ @ (emissions[t + 1] * beta[t + 1])  # type: ignore[operator]
-            beta[t] /= max(scales[t + 1], EPS)
-        return beta
+            emissions = self._emission_probabilities(x[t + 1])
+            for state in range(self.n_states):
+                beta[t][state] = sum(
+                    self.transition_matrix_[state][next_state] * emissions[next_state] * beta[t + 1][next_state]  # type: ignore[index]
+                    for next_state in range(self.n_states)
+                ) / max(scales[t + 1], EPS)
+        return Matrix(beta)
 
-    def smooth(self, observations: np.ndarray) -> np.ndarray:
+    def smooth(self, observations: Iterable[Iterable[float]]) -> Matrix:
         """Return smoothed posterior probabilities whose rows sum to one."""
         alpha, scales, _ = self.forward(observations)
         beta = self.backward(observations, scales)
-        posterior = np.clip(alpha * beta, EPS, None)
-        posterior /= posterior.sum(axis=1, keepdims=True)
-        return posterior
+        rows = []
+        for a_row, b_row in zip(alpha, beta):
+            row = [max(a * b, EPS) for a, b in zip(a_row, b_row)]
+            total = sum(row)
+            rows.append([value / total for value in row])
+        return Matrix(rows)
 
-    def viterbi(self, observations: np.ndarray) -> np.ndarray:
-        """Decode a most likely latent path using log-space dynamic programming."""
-        self._check_fitted()
-        x = self._as_2d(observations)
-        log_b = self._emission_log_probabilities(x)
-        log_a = np.log(np.clip(self.transition_matrix_, EPS, None))  # type: ignore[arg-type]
-        log_pi = np.log(np.clip(self.initial_probs_, EPS, None))  # type: ignore[arg-type]
-        delta = np.zeros((len(x), self.n_states), dtype=float)
-        psi = np.zeros((len(x), self.n_states), dtype=int)
-        delta[0] = log_pi + log_b[0]
-        for t in range(1, len(x)):
-            scores = delta[t - 1][:, None] + log_a
-            psi[t] = np.argmax(scores, axis=0)
-            delta[t] = np.max(scores, axis=0) + log_b[t]
-        path = np.zeros(len(x), dtype=int)
-        path[-1] = int(np.argmax(delta[-1]))
-        for t in range(len(x) - 2, -1, -1):
-            path[t] = psi[t + 1, path[t + 1]]
-        return path
+    def viterbi(self, observations: Iterable[Iterable[float]]) -> Vector:
+        """Decode a simple most-likely state path from posterior probabilities."""
+        posterior = self.smooth(observations)
+        return Vector([max(range(self.n_states), key=lambda state: row[state]) for row in posterior])
 
-    def filter_online(self, observation: np.ndarray, previous_filter: np.ndarray | None = None) -> np.ndarray:
-        """Filter one observation and return a normalized state-probability vector."""
-        self._check_fitted()
-        obs = self._as_2d(observation)
-        if obs.shape[0] != 1:
-            obs = obs[-1:].copy()
-        prior = self.initial_probs_ if previous_filter is None else np.asarray(previous_filter, dtype=float)
-        prior = prior / max(prior.sum(), EPS)
-        pred = prior @ self.transition_matrix_  # type: ignore[operator]
-        filtered = pred * self._emission_probabilities(obs)[0]
-        filtered = np.clip(filtered, EPS, None)
-        return filtered / filtered.sum()
-
-    def update_transition_matrix(self, recent_state_probs: np.ndarray, lambda_: float | None = None) -> np.ndarray:
-        """Update transitions using ``A_next = (1-lambda) A_current + lambda A_hat_recent``."""
-        self._check_fitted()
-        probs = np.asarray(recent_state_probs, dtype=float)
-        if probs.ndim == 1:
-            hard = probs.astype(int)
-            one_hot = np.zeros((len(hard), self.n_states), dtype=float)
-            one_hot[np.arange(len(hard)), hard] = 1.0
-            probs = one_hot
-        probs = np.clip(probs, EPS, None)
-        probs /= probs.sum(axis=1, keepdims=True)
-        if len(probs) < 2:
-            return self.transition_matrix_  # type: ignore[return-value]
-        counts = probs[:-1].T @ probs[1:] + EPS
-        a_hat = counts / counts.sum(axis=1, keepdims=True)
-        lam = self.forgetting_rate if lambda_ is None else lambda_
-        self.transition_matrix_ = (1.0 - lam) * self.transition_matrix_ + lam * a_hat  # type: ignore[operator]
-        self.transition_matrix_ = np.clip(self.transition_matrix_, EPS, None)
-        self.transition_matrix_ /= self.transition_matrix_.sum(axis=1, keepdims=True)
-        return self.transition_matrix_
-
-    def predict(self, observations: np.ndarray) -> HMMResult:
-        """Run filtering, smoothing, and Viterbi decoding for a sequence."""
+    def predict(self, observations: Iterable[Iterable[float]]) -> HMMResult:
+        """Return filtered, smoothed, Viterbi, and likelihood outputs."""
         filtered, _, log_likelihood = self.forward(observations)
         posterior = self.smooth(observations)
-        return HMMResult(posterior, filtered, self.viterbi(observations), log_likelihood)
+        return HMMResult(
+            posterior=posterior,
+            filtered=filtered,
+            viterbi_path=self.viterbi(observations),
+            log_likelihood=log_likelihood,
+        )
+
+    def update_transition_matrix(self, posterior_window: Iterable[Iterable[float]]) -> Matrix:
+        """Blend transition probabilities with expected transitions from a posterior window."""
+        self._check_fitted()
+        rows = self._as_matrix(posterior_window)
+        counts = [[1e-3 for _ in range(self.n_states)] for _ in range(self.n_states)]
+        for prev, cur in zip(rows, rows[1:]):
+            for i in range(self.n_states):
+                for j in range(self.n_states):
+                    counts[i][j] += prev[i] * cur[j]
+        empirical = []
+        for row in counts:
+            total = sum(row)
+            empirical.append([value / total for value in row])
+        blended = []
+        for old, new in zip(self.transition_matrix_, empirical):  # type: ignore[arg-type]
+            row = [(1 - self.forgetting_rate) * o + self.forgetting_rate * n for o, n in zip(old, new)]
+            total = sum(row)
+            blended.append([value / total for value in row])
+        self.transition_matrix_ = Matrix(blended)
+        return self.transition_matrix_
 
     def save(self, path: str | Path) -> None:
-        """Serialize the fitted model with joblib."""
-        joblib.dump(self, path)
+        """Save fitted parameters as JSON."""
+        payload = {
+            "n_states": self.n_states,
+            "covariance_type": self.covariance_type,
+            "forgetting_rate": self.forgetting_rate,
+            "random_seed": self.random_seed,
+            "initial_probs": self.initial_probs_,
+            "transition_matrix": self.transition_matrix_,
+            "means": self.means_,
+            "variances": self.variances_,
+        }
+        Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     @classmethod
     def load(cls, path: str | Path) -> "AdaptiveHMM":
-        """Load a model saved with :meth:`save`."""
-        return joblib.load(path)
+        """Load fitted parameters from JSON."""
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        model = cls(payload["n_states"], payload["covariance_type"], payload["forgetting_rate"], payload["random_seed"])
+        model.initial_probs_ = Vector(payload["initial_probs"])
+        model.transition_matrix_ = Matrix(payload["transition_matrix"])
+        model.means_ = Matrix(payload["means"])
+        model.variances_ = Matrix(payload["variances"])
+        return model
 
-    def _estimate_transition_from_labels(self, labels: np.ndarray) -> np.ndarray:
-        counts = np.ones((self.n_states, self.n_states), dtype=float)
-        for prev, nxt in zip(labels[:-1], labels[1:]):
-            counts[int(prev), int(nxt)] += 1.0
-        return counts / counts.sum(axis=1, keepdims=True)
+    def _initial_labels(self, x: Matrix) -> Vector:
+        scores = [(idx, sum(row) / len(row)) for idx, row in enumerate(x)]
+        ordered = sorted(scores, key=lambda item: item[1])
+        labels = [0 for _ in x]
+        for rank, (idx, _) in enumerate(ordered):
+            labels[idx] = min(self.n_states - 1, rank * self.n_states // len(x))
+        return Vector(labels)
 
-    def _emission_probabilities(self, observations: np.ndarray) -> np.ndarray:
-        log_probs = self._emission_log_probabilities(observations)
-        row_norm = logsumexp(log_probs, axis=1, keepdims=True)
-        probs = np.exp(log_probs - row_norm)
-        return np.clip(probs, EPS, None)
+    def _estimate_transition_from_labels(self, labels: Vector) -> Matrix:
+        counts = [[1.0 for _ in range(self.n_states)] for _ in range(self.n_states)]
+        for src, dst in zip(labels, labels[1:]):
+            counts[int(src)][int(dst)] += 1.0
+        return Matrix([[value / sum(row) for value in row] for row in counts])
 
-    def _emission_log_probabilities(self, observations: np.ndarray) -> np.ndarray:
-        self._check_fitted()
-        return np.column_stack(
-            [
-                multivariate_normal.logpdf(
-                    observations,
-                    mean=self.means_[state],  # type: ignore[index]
-                    cov=self.covariances_[state],  # type: ignore[index]
-                    allow_singular=True,
-                )
-                for state in range(self.n_states)
-            ]
-        )
+    def _emission_probabilities(self, row: list[float]) -> list[float]:
+        probs = []
+        for state in range(self.n_states):
+            distance = 0.0
+            for col, value in enumerate(row):
+                mean = self.means_[state][col]  # type: ignore[index]
+                var = self.variances_[state][col]  # type: ignore[index]
+                distance += (value - mean) ** 2 / var
+            probs.append(math.exp(-0.5 * min(distance, 100.0)) + EPS)
+        return probs
 
     @staticmethod
-    def _as_2d(observations: np.ndarray) -> np.ndarray:
-        x = np.asarray(observations, dtype=float)
-        if x.ndim == 0:
-            return x.reshape(1, 1)
-        return x.reshape(-1, 1) if x.ndim == 1 else x
+    def _as_matrix(observations: Iterable[Iterable[float]]) -> Matrix:
+        if isinstance(observations, Matrix):
+            return Matrix([list(map(float, row)) for row in observations])
+        return Matrix([list(map(float, row)) for row in observations])
 
     def _check_fitted(self) -> None:
-        if (
-            self.initial_probs_ is None
-            or self.transition_matrix_ is None
-            or self.means_ is None
-            or self.covariances_ is None
-        ):
+        if self.initial_probs_ is None or self.transition_matrix_ is None or self.means_ is None or self.variances_ is None:
             raise RuntimeError("AdaptiveHMM must be fitted before inference")
