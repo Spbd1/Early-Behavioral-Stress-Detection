@@ -1,3 +1,11 @@
-# The core syntax/runtime validation path is dependency-free.
-# Optional integrations such as Langflow, Streamlit, Plotly, and scientific Python
-# packages can be installed separately when network access is available.
+numpy
+pandas
+scipy
+scikit-learn
+statsmodels
+pydantic
+PyYAML
+joblib
+tqdm
+plotly
+streamlit
