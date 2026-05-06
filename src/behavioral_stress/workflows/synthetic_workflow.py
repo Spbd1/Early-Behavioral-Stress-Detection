@@ -15,6 +15,12 @@ from behavioral_stress.utils.config import load_config
 from behavioral_stress.validation.synthetic_validation import evaluate_stress_probability
 
 
+WORKFLOW_WARNING = (
+    "Experimental research prototype. Not a validated recession predictor. "
+    "Aggregate-level inference only."
+)
+
+
 def run_synthetic_workflow(config_path: str | Path) -> dict[str, Any]:
     """Run config → data → preprocessing → ontology → AdaptiveHMM → metrics → output files."""
     cfg = load_config(config_path)
@@ -66,6 +72,17 @@ def run_synthetic_workflow(config_path: str | Path) -> dict[str, Any]:
         index=[f"from_{i}" for i in range(model.n_states)],
     ).to_csv(paths["transition_matrix"])
     pd.Series(metrics.values(), index=metrics.keys(), name="value").to_csv(paths["metrics"])
-    metadata = {**data.metadata, "model": model_cfg, "outputs": {k: str(v) for k, v in paths.items()}}
+    files = {name: str(path) for name, path in paths.items()}
+    metadata = {
+        **data.metadata,
+        "model": model_cfg,
+        "outputs": files,
+        "warning": WORKFLOW_WARNING,
+    }
     paths["run_metadata"].write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-    return {"output_dir": str(out_dir), "paths": {k: str(v) for k, v in paths.items()}, "metrics": metrics}
+    return {
+        "output_dir": str(out_dir),
+        "metrics": metrics,
+        "files": files,
+        "warning": WORKFLOW_WARNING,
+    }
