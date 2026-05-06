@@ -9,3 +9,5 @@ model:
 dashboard:
   title: Behavioral Stress Regime Detection
   banner: "Experimental research prototype. Not a validated recession predictor. Aggregate-level inference only."
+outputs:
+  directory: data/synthetic

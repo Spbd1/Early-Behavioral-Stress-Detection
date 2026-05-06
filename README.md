@@ -1,22 +1,26 @@
 # Behavioral Stress Regime Detection
 
-Research prototype for the paper idea **“Detecting Early Behavioral Stress Regimes in Economic Systems: Adaptive Hidden Markov Models, Behavioral Ontologies, and High-Frequency Digital Traces.”**
+Research prototype for **“Detecting Early Behavioral Stress Regimes in Economic Systems: Adaptive Hidden Markov Models, Behavioral Ontologies, and High-Frequency Digital Traces.”**
 
-This repository provides a reproducible Python framework for simulating, detecting, validating, and interpreting latent behavioral stress regimes in aggregate economic/digital traces. The default workflow uses synthetic data with known latent regimes.
+**This project is an experimental research prototype. It is not a validated recession predictor, not a production forecasting system, and not a tool for individual behavioral diagnosis or policy prescription.**
 
-## What this project is
+The default demo uses synthetic aggregate-level traces with known latent regimes. The code is intended for cautious synthetic validation of latent regime detection methods, behavioral signal ontologies, and workflow orchestration.
 
-- A transparent research framework for latent regime detection.
-- A synthetic-data-first testbed for Adaptive Hidden Markov Models (HMMs).
-- A modular codebase for ontology-guided signal analysis, validation, and visualization.
-- A scaffold for optional Langflow orchestration.
+## What it is
 
-## What this project is not
+- A Python research prototype for synthetic latent regime detection.
+- A synthetic-data-first workflow using aggregate-level traces.
+- A modular implementation of an Adaptive Gaussian HMM with stable filtering, smoothing, and Viterbi decoding.
+- A behavioral ontology/codebook scaffold for aggregate signals.
+- CLI, Streamlit, Docker, and Langflow scaffolds.
 
-- It is **not** a validated recession predictor.
-- It is **not** a production forecasting system.
-- It does **not** infer individual-level stress or diagnose behavior.
-- It does **not** make policy recommendations.
+## What it is not
+
+- Not a validated recession predictor.
+- Not a production forecasting system.
+- Not a tool for individual-level stress inference or diagnosis.
+- Not a source of policy recommendations.
+- Not a causal identification design for real-world interventions.
 
 ## Installation
 
@@ -24,70 +28,107 @@ This repository provides a reproducible Python framework for simulating, detecti
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
+python -c "import behavioral_stress; print(behavioral_stress.__version__)"
 ```
 
-For optional Langflow support:
+Optional extras:
 
 ```bash
+pip install -e .[dashboard]
 pip install -e .[langflow]
+pip install -e .[advanced]
+pip install -e .[dev]
 ```
 
-## Run the synthetic demo
+## Synthetic demo
 
 ```bash
 python scripts/run_synthetic_demo.py --config configs/synthetic.yaml
 ```
 
-Outputs are written to `data/synthetic/` and include observations, covariates, ground-truth latent states, posterior probabilities, Viterbi path, and validation metrics.
+Expected outputs:
 
-## Run validation scaffolding
+- `data/synthetic/observations.csv`
+- `data/synthetic/covariates.csv`
+- `data/synthetic/latent_states.csv`
+- `data/synthetic/codebook.csv`
+- `data/synthetic/posterior.csv`
+- `data/synthetic/filtered.csv`
+- `data/synthetic/viterbi_path.csv`
+- `data/synthetic/transition_matrix.csv`
+- `data/synthetic/metrics.csv`
+- `data/synthetic/run_metadata.json`
+
+## Validation
 
 ```bash
 python scripts/run_validation.py --config configs/validation.yaml
 ```
 
-The validation package includes synthetic validation, rolling-origin split generation, metrics, and ablation labels for static HMM, adaptive HMM, conditional adaptive HMM, and adaptive HMM plus causal diagnostics.
+Validation metrics are designed for synthetic data with known latent states and should not be interpreted as real-world recession prediction performance.
 
-## Launch the dashboard
+## Dashboard
 
 ```bash
+python scripts/build_dashboard.py --config configs/default.yaml
 streamlit run src/behavioral_stress/visualization/dashboard.py
 ```
 
-The dashboard displays the mandatory banner:
+The dashboard displays the warning banner, posterior regime probabilities, Viterbi path, synthetic latent truth when available, ontology-coded observations, transition matrix, metrics, and placeholders for KL drift diagnostics.
 
-> Experimental research prototype. Not a validated recession predictor. Aggregate-level inference only.
-
-## Langflow
-
-See `langflow/README.md`. Langflow is an optional orchestration layer. The core modeling engine remains in the Python package for testability and reproducibility.
-
-## Repository layout
-
-- `src/behavioral_stress/data`: ingestion placeholders, preprocessing, and synthetic data generation.
-- `src/behavioral_stress/ontology`: extensible behavioral signal ontology and codebook helpers.
-- `src/behavioral_stress/models`: adaptive HMM, conditional HMM prototype, emissions, and baselines.
-- `src/behavioral_stress/signal_discovery`: PCA/UMAP exploration, feature screening, and KL drift review diagnostics.
-- `src/behavioral_stress/causal`: cautious causal interpretation templates and limitations.
-- `src/behavioral_stress/validation`: rolling-origin validation, metrics, ablation, and synthetic validation.
-- `src/behavioral_stress/visualization`: Plotly helpers and Streamlit dashboard shell.
-
-## Limitations and Responsible Use
-
-- Aggregate-level inference only.
-- No individual behavioral diagnosis.
-- No claim of reliable recession prediction.
-- Digital trace bias and platform/API bias may affect signals.
-- Aggregate digital traces may not be representative of populations or regions.
-- Concept drift can invalidate previously useful signals.
-- Overfitting and multiple-testing risk are substantial in high-frequency trace discovery.
-- False alarms and missed regimes are expected in exploratory prototypes.
-- Causal ambiguity is fundamental in observational aggregate data.
-- Endogeneity, omitted variables, policy feedback, ecological fallacy, and time-varying confounding must be addressed by separate credible causal designs.
-- No policy prescription should be produced without separate causal identification and domain review.
-
-## Tests
+## Langflow workflow
 
 ```bash
-pytest
+pip install -e .[langflow]
+langflow run
+python scripts/export_langflow_demo.py
 ```
+
+Then import `langflow/behavioral_stress_flow.json` and add custom components from `langflow/custom_components/`. See `langflow/README.md` for details. The pure-Python fallback runner is `behavioral_stress.workflows.synthetic_workflow.run_synthetic_workflow`.
+
+## Docker
+
+From the repository root:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build research-demo
+```
+
+Dashboard:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build dashboard
+```
+
+Optional Langflow service is behind the `langflow` profile because Langflow is comparatively heavy:
+
+```bash
+docker compose -f docker/docker-compose.yml --profile langflow up --build langflow
+```
+
+## Repository structure
+
+```text
+configs/                  YAML configurations
+data/                     synthetic/raw/processed data directories
+langflow/                 flow JSON plus custom component wrappers
+scripts/                  command-line entry points
+src/behavioral_stress/    package source
+tests/                    pytest tests
+```
+
+## Limitations and responsible use
+
+- The runnable workflow uses synthetic aggregate traces only.
+- The model detects latent regimes in synthetic validation; it does not prove recession predictability.
+- Observational aggregate digital traces do not identify causal effects by themselves.
+- Endogeneity, omitted variables, policy feedback, ecological fallacy, sample-selection bias, measurement drift, and time-varying confounding are serious threats for real data.
+- Signal retirement diagnostics flag features for human review only and never automatically delete features.
+
+## Citation placeholder
+
+If this prototype supports a paper or preprint, cite the forthcoming manuscript and this repository version.
+
+## Contributing
+
+Please keep language cautious, preserve the synthetic-data default, add tests for new behavior, and avoid claims of reliable recession prediction, individual diagnosis, or policy prescription.

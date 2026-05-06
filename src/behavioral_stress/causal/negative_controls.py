@@ -1,10 +1,10 @@
-"""Negative-control check scaffolding."""
+"""Negative-control diagnostics for aggregate observational templates."""
 from __future__ import annotations
 
-import pandas as pd
-import statsmodels.formula.api as smf
+import numpy as np
 
 
-def fit_negative_control(frame: pd.DataFrame, formula: str):
-    """Fit a negative-control regression used to probe residual confounding."""
-    return smf.ols(formula=formula, data=frame).fit()
+def negative_control_check(outcome: np.ndarray, negative_control: np.ndarray) -> dict[str, float | str]:
+    """Return correlation with a negative-control trace as a confounding diagnostic."""
+    corr = float(np.corrcoef(outcome, negative_control)[0, 1]) if len(outcome) > 1 else float("nan")
+    return {"negative_control_correlation": corr, "note": "Diagnostic only; does not identify causal effects."}

@@ -1,32 +1,49 @@
-"""Emission distributions for regime models."""
+"""Emission distributions for aggregate trace models."""
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
-from scipy.stats import nbinom
+from scipy.stats import multivariate_normal, nbinom
 
 
+@dataclass
+class GaussianEmission:
+    """Gaussian emission for normalized continuous aggregate traces."""
+
+    mean: np.ndarray
+    covariance: np.ndarray
+
+    def log_prob(self, observations: np.ndarray) -> np.ndarray:
+        """Return log probabilities under a multivariate Gaussian emission."""
+        return multivariate_normal.logpdf(observations, mean=self.mean, cov=self.covariance, allow_singular=True)
+
+
+@dataclass
 class NegativeBinomialEmission:
-    """Negative Binomial emission for overdispersed count-like digital traces.
+    """Negative-binomial emission for overdispersed aggregate count traces.
 
-    Gaussian emissions are appropriate for normalized continuous indices. Negative Binomial
-    emissions are preferable for non-negative counts whose variance exceeds the mean.
+    ``log(mu_t) = eta_i + delta_t + gamma^T X_t`` and ``r`` controls overdispersion.
     """
 
-    def __init__(self, eta: float, dispersion: float, gamma: np.ndarray | None = None) -> None:
-        self.eta = eta
-        self.dispersion = dispersion
-        self.gamma = gamma
+    eta: float
+    r: float = 8.0
+    gamma: np.ndarray | None = None
 
-    def mean(self, covariates: np.ndarray | None = None, offset: float = 0.0) -> float:
-        """Compute mu where log(mu)=eta+offset+gamma'X."""
-        linear = self.eta + offset
+    def mean(self, covariates: np.ndarray | None = None, delta_t: np.ndarray | float = 0.0) -> np.ndarray:
+        """Compute the conditional mean ``mu_t``."""
+        linear = np.asarray(delta_t, dtype=float) + self.eta
         if covariates is not None and self.gamma is not None:
-            linear += float(np.dot(self.gamma, covariates))
-        return float(np.exp(linear))
+            linear = linear + np.asarray(covariates) @ self.gamma
+        return np.exp(linear)
 
-    def logpmf(self, y: np.ndarray, covariates: np.ndarray | None = None, offset: float = 0.0) -> np.ndarray:
-        """Evaluate log probabilities for observed counts."""
-        mu = self.mean(covariates, offset)
-        r = self.dispersion
-        p = r / (r + mu)
-        return nbinom.logpmf(y, r, p)
+    def log_prob(
+        self,
+        counts: np.ndarray,
+        covariates: np.ndarray | None = None,
+        delta_t: np.ndarray | float = 0.0,
+    ) -> np.ndarray:
+        """Return log probabilities for overdispersed count observations."""
+        mu = self.mean(covariates=covariates, delta_t=delta_t)
+        p = self.r / (self.r + mu)
+        return nbinom.logpmf(counts, n=self.r, p=p)

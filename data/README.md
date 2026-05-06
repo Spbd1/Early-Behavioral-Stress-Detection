@@ -1,3 +1,4 @@
-# Data directory
+# Data Directory
 
-Synthetic data is the default and reproducible demo path. Place externally acquired aggregate data in `raw/` only when license and privacy constraints allow it. Processed files should avoid individual-level traces; this prototype is designed for aggregate-level research analysis.
+The default runnable workflow writes **synthetic aggregate traces only** to `data/synthetic/`.
+Do not commit sensitive, individual-level, or proprietary data here.

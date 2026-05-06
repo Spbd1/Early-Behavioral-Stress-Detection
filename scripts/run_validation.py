@@ -1,23 +1,25 @@
 #!/usr/bin/env python
-"""Run lightweight validation workflow."""
+"""Run validation for the synthetic latent-regime prototype."""
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
-import typer
+import pandas as pd
 
-from behavioral_stress.utils.config import load_config
-
-app = typer.Typer(add_completion=False)
+from behavioral_stress.workflows.synthetic_workflow import run_synthetic_workflow
 
 
-@app.command()
-def main(config: Path = typer.Option(Path("configs/validation.yaml"), "--config")) -> None:
-    """Load validation config and report available validation scaffolding."""
-    cfg = load_config(config)
-    typer.echo("Validation configuration loaded.")
-    typer.echo(cfg.get("validation", {}))
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run synthetic validation")
+    parser.add_argument("--config", type=Path, default=Path("configs/validation.yaml"))
+    args = parser.parse_args()
+    result = run_synthetic_workflow(args.config)
+    metrics_path = Path(result["output_dir"]) / "validation_summary.csv"
+    pd.Series(result["metrics"], name="value").to_csv(metrics_path)
+    print(f"Validation metrics written to {metrics_path}")
+    print(result["metrics"])
 
 
 if __name__ == "__main__":
-    app()
+    main()

@@ -2,28 +2,30 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.special import rel_entr
 
 
-def histogram_kl_divergence(old_values: np.ndarray, new_values: np.ndarray, bins: int = 20) -> float:
-    """Estimate D_KL(P_old || P_new) with shared histogram bins."""
-    combined = np.concatenate([old_values, new_values])
-    counts_old, edges = np.histogram(old_values, bins=bins, range=(combined.min(), combined.max()))
-    counts_new, _ = np.histogram(new_values, bins=edges)
-    p_old = (counts_old + 1e-6) / (counts_old.sum() + 1e-6 * bins)
-    p_new = (counts_new + 1e-6) / (counts_new.sum() + 1e-6 * bins)
-    return float(np.sum(rel_entr(p_old, p_new)))
+def kl_divergence_gaussian(old_values: np.ndarray, new_values: np.ndarray, eps: float = 1e-8) -> float:
+    """Estimate ``D_KL(N_old || N_new)`` for one-dimensional Gaussian approximations."""
+    old = np.asarray(old_values, dtype=float)
+    new = np.asarray(new_values, dtype=float)
+    mu0, mu1 = old.mean(), new.mean()
+    var0, var1 = old.var() + eps, new.var() + eps
+    score = 0.5 * (np.log(var1 / var0) + (var0 + (mu0 - mu1) ** 2) / var1 - 1)
+    return float(max(score, 0.0))
 
 
 def flag_signal_retirement(
     old_values: np.ndarray,
     new_values: np.ndarray,
-    retirement_threshold: float,
-    bins: int = 20,
-) -> dict[str, float | bool]:
-    """Flag a signal for human review when KL drift exceeds a validation-selected threshold.
+    threshold: float = 0.5,
+) -> dict[str, float | bool | str]:
+    """Flag KL drift for human review only; never automatically delete features.
 
-    The diagnostic never deletes features automatically; it only returns a review flag.
+    The threshold should be selected inside rolling-origin or nested validation.
     """
-    kl_value = histogram_kl_divergence(old_values, new_values, bins=bins)
-    return {"kl_divergence": kl_value, "flag_for_review": bool(kl_value > retirement_threshold)}
+    score = kl_divergence_gaussian(old_values, new_values)
+    return {
+        "kl_divergence": score,
+        "flag_for_review": bool(score > threshold),
+        "note": "Review flag only; do not automatically retire or delete aggregate features.",
+    }

@@ -1,11 +1,11 @@
 import numpy as np
 
-from behavioral_stress.validation.metrics import binary_classification_metrics, lead_time
+from behavioral_stress.validation.metrics import binary_classification_metrics
 
 
-def test_metrics_simple_example():
-    metrics = binary_classification_metrics(np.array([0, 0, 1, 1]), np.array([0.1, 0.4, 0.8, 0.9]))
+def test_binary_metrics_simple_and_degenerate():
+    metrics = binary_classification_metrics(np.array([0, 1, 1, 0]), np.array([0.1, 0.8, 0.7, 0.2]))
     assert metrics["precision"] == 1.0
     assert metrics["recall"] == 1.0
-    assert metrics["brier_score"] >= 0.0
-    assert lead_time(3, 5) == 2
+    degenerate = binary_classification_metrics(np.zeros(4), np.array([0.1, 0.2, 0.3, 0.4]))
+    assert "roc_auc" in degenerate
