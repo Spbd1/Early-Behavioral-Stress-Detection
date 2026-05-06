@@ -1,45 +1,39 @@
 """Adaptive Gaussian Hidden Markov Model utilities.
 
-The model in this module is intended for research workflows that need a
-small, inspectable HMM implementation.  It performs Gaussian-emission
-initialization from observed data and numerically stable inference with scaled
-forward/backward recursions.
+This module keeps a compact, valid Python implementation of the adaptive HMM
+used by the focused tests.  It uses only the Python standard library so the
+module remains importable before optional scientific dependencies are present.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 from pathlib import Path
-
-import numpy as np
-from numpy.typing import ArrayLike, NDArray
-from scipy.special import logsumexp
-from sklearn.cluster import KMeans
+from typing import Sequence
 
 EPS = 1e-12
 MIN_VARIANCE = 1e-6
-FloatArray = NDArray[np.float64]
-IntArray = NDArray[np.int64]
+
+Vector = list[float]
+Matrix = list[Vector]
+PathVector = list[int]
+ArrayLike = Sequence[float] | Sequence[Sequence[float]]
 
 
 @dataclass
 class HMMResult:
     """Inference outputs for one observation sequence."""
 
-    posterior: FloatArray
-    filtered: FloatArray
-    viterbi_path: IntArray
+    posterior: Matrix
+    filtered: Matrix
+    viterbi_path: PathVector
     log_likelihood: float
 
 
 class AdaptiveHMM:
-    """Gaussian-emission Hidden Markov Model with adaptive transitions.
-
-    Parameters are initialized from observations using ``KMeans`` and simple
-    maximum-likelihood summaries.  Inference uses scaled forward and backward
-    recursions so filtered and smoothed probabilities remain normalized and the
-    sequence log likelihood remains finite for typical research-sized inputs.
-    """
+    """Diagonal Gaussian Hidden Markov Model with adaptive transitions."""
 
     def __init__(
         self,
@@ -48,180 +42,193 @@ class AdaptiveHMM:
         forgetting_rate: float = 0.05,
         random_seed: int = 42,
     ) -> None:
-        """Create an unfitted adaptive HMM.
-
-        Args:
-            n_states: Number of latent states.
-            covariance_type: Currently supports diagonal Gaussian covariance.
-            forgetting_rate: Weight assigned to newly estimated transition
-                counts in :meth:`update_transition_matrix`.
-            random_seed: Seed used for KMeans initialization.
-        """
         if n_states < 2:
             raise ValueError("n_states must be at least 2")
         if covariance_type != "diagonal":
             raise ValueError("covariance_type must be 'diagonal'")
-        if not 0 <= forgetting_rate <= 1:
+        if not 0.0 <= forgetting_rate <= 1.0:
             raise ValueError("forgetting_rate must be in [0, 1]")
+
         self.n_states = n_states
         self.covariance_type = covariance_type
         self.forgetting_rate = forgetting_rate
         self.random_seed = random_seed
-        self.initial_probs_: FloatArray | None = None
-        self.transition_matrix_: FloatArray | None = None
-        self.means_: FloatArray | None = None
-        self.variances_: FloatArray | None = None
+        self.initial_probs_: Vector | None = None
+        self.transition_matrix_: Matrix | None = None
+        self.means_: Matrix | None = None
+        self.variances_: Matrix | None = None
 
     def fit(self, observations: ArrayLike) -> "AdaptiveHMM":
-        """Initialize Gaussian emissions and transition probabilities.
-
-        One-dimensional observations are treated as a single feature column.
-        States are initialized with ``sklearn.cluster.KMeans``; state labels are
-        then ordered by mean feature value for deterministic interpretation.
-        """
-        x = self._as_matrix(observations)
-        if len(x) < self.n_states:
+        """Initialize model parameters from observations."""
+        rows = self._as_matrix(observations)
+        if len(rows) < self.n_states:
             raise ValueError("Need at least n_states observations")
 
-        labels = self._initial_labels(x)
-        means: list[FloatArray] = []
-        variances: list[FloatArray] = []
-        initial_counts = np.full(self.n_states, EPS, dtype=float)
+        labels = self._initial_labels(rows)
+        feature_count = len(rows[0])
+        global_mean = self._column_means(rows)
+        global_var = self._column_variances(rows, global_mean)
+
+        means: Matrix = []
+        variances: Matrix = []
+        for state in range(self.n_states):
+            members = [row for row, label in zip(rows, labels) if label == state]
+            if members:
+                state_mean = self._column_means(members)
+                state_var = self._column_variances(members, state_mean)
+            else:
+                state_mean = list(global_mean)
+                state_var = list(global_var)
+            if len(state_mean) != feature_count:
+                raise ValueError("inconsistent observation dimensions")
+            means.append(state_mean)
+            variances.append(state_var)
+
+        initial_counts = [EPS for _ in range(self.n_states)]
         initial_counts[labels[0]] += 1.0
 
-        global_mean = x.mean(axis=0)
-        global_var = np.maximum(x.var(axis=0), MIN_VARIANCE)
-        for state in range(self.n_states):
-            members = x[labels == state]
-            if len(members) == 0:
-                means.append(global_mean)
-                variances.append(global_var)
-                continue
-            means.append(members.mean(axis=0))
-            variances.append(np.maximum(members.var(axis=0), MIN_VARIANCE))
-
-        self.means_ = np.vstack(means).astype(float)
-        self.variances_ = np.vstack(variances).astype(float)
         self.initial_probs_ = self._normalize_vector(initial_counts)
         self.transition_matrix_ = self._estimate_transition_from_labels(labels)
+        self.means_ = means
+        self.variances_ = variances
         return self
 
-    def forward(self, observations: ArrayLike) -> tuple[FloatArray, FloatArray, float]:
-        """Run the scaled forward recursion.
-
-        Returns:
-            A tuple of ``(filtered_probabilities, scales, log_likelihood)``.
-            Each row of ``filtered_probabilities`` sums to one and the log
-            likelihood is computed from the scaling constants.
-        """
+    def forward(self, observations: ArrayLike) -> tuple[Matrix, Vector, float]:
+        """Run scaled forward filtering."""
         self._check_fitted()
-        x = self._as_matrix(observations)
-        alpha = np.zeros((len(x), self.n_states), dtype=float)
-        scales = np.zeros(len(x), dtype=float)
-        log_likelihood = 0.0
+        rows = self._as_matrix(observations)
+        emissions = self._emission_probabilities(rows)
+        initial = self.initial_probs_ or []
+        transitions = self.transition_matrix_ or []
 
-        emissions = self._emission_probabilities(x)
-        current = self.initial_probs_ * emissions[0]  # type: ignore[operator]
-        scales[0] = max(float(current.sum()), EPS)
-        alpha[0] = current / scales[0]
-        log_likelihood += np.log(scales[0])
+        filtered: Matrix = []
+        scales: Vector = []
 
-        for t in range(1, len(x)):
-            predicted = alpha[t - 1] @ self.transition_matrix_  # type: ignore[operator]
-            current = predicted * emissions[t]
-            scales[t] = max(float(current.sum()), EPS)
-            alpha[t] = current / scales[t]
-            log_likelihood += np.log(scales[t])
+        current = [initial[state] * emissions[0][state] for state in range(self.n_states)]
+        scale = max(sum(current), EPS)
+        filtered.append([value / scale for value in current])
+        scales.append(scale)
 
-        return alpha, scales, float(log_likelihood)
+        for t in range(1, len(rows)):
+            predicted = [
+                sum(filtered[t - 1][source] * transitions[source][target] for source in range(self.n_states))
+                for target in range(self.n_states)
+            ]
+            current = [predicted[state] * emissions[t][state] for state in range(self.n_states)]
+            scale = max(sum(current), EPS)
+            filtered.append([value / scale for value in current])
+            scales.append(scale)
 
-    def backward(self, observations: ArrayLike, scales: ArrayLike) -> FloatArray:
-        """Run the scaled backward recursion compatible with :meth:`forward`.
+        return filtered, scales, sum(math.log(scale) for scale in scales)
 
-        Args:
-            observations: Observation sequence used for the forward pass.
-            scales: Scaling constants returned by :meth:`forward`.
-        """
+    def backward(self, observations: ArrayLike, scales: Sequence[float]) -> Matrix:
+        """Run scaled backward recursion using forward-pass scales."""
         self._check_fitted()
-        x = self._as_matrix(observations)
-        scale_values = np.asarray(scales, dtype=float)
-        if scale_values.shape != (len(x),):
+        rows = self._as_matrix(observations)
+        if len(scales) != len(rows):
             raise ValueError("scales must have one value per observation")
 
-        beta = np.ones((len(x), self.n_states), dtype=float)
-        emissions = self._emission_probabilities(x)
-        for t in range(len(x) - 2, -1, -1):
-            next_terms = emissions[t + 1] * beta[t + 1]
-            beta[t] = (self.transition_matrix_ @ next_terms) / max(float(scale_values[t + 1]), EPS)  # type: ignore[operator]
-        return np.maximum(beta, EPS)
+        emissions = self._emission_probabilities(rows)
+        transitions = self.transition_matrix_ or []
+        backward: Matrix = [[1.0 for _ in range(self.n_states)] for _ in rows]
 
-    def smooth(self, observations: ArrayLike) -> FloatArray:
-        """Return normalized smoothed posterior state probabilities."""
-        alpha, scales, _ = self.forward(observations)
-        beta = self.backward(observations, scales)
-        posterior = np.maximum(alpha * beta, EPS)
-        return self._normalize_rows(posterior)
+        for t in range(len(rows) - 2, -1, -1):
+            for source in range(self.n_states):
+                total = 0.0
+                for target in range(self.n_states):
+                    total += transitions[source][target] * emissions[t + 1][target] * backward[t + 1][target]
+                backward[t][source] = total / max(float(scales[t + 1]), EPS)
 
-    def viterbi(self, observations: ArrayLike) -> IntArray:
+        return backward
+
+    def smooth(self, observations: ArrayLike) -> Matrix:
+        """Return normalized smoothed state probabilities."""
+        filtered, scales, _ = self.forward(observations)
+        backward = self.backward(observations, scales)
+        return self._normalize_rows(
+            [
+                [filtered[t][state] * backward[t][state] for state in range(self.n_states)]
+                for t in range(len(filtered))
+            ]
+        )
+
+    def viterbi(self, observations: ArrayLike) -> PathVector:
         """Decode the most likely latent-state path in log space."""
         self._check_fitted()
-        x = self._as_matrix(observations)
-        emissions = self._emission_probabilities(x)
-        log_initial = np.log(np.maximum(self.initial_probs_, EPS))  # type: ignore[arg-type]
-        log_transition = np.log(np.maximum(self.transition_matrix_, EPS))  # type: ignore[arg-type]
-        log_emissions = np.log(np.maximum(emissions, EPS))
+        rows = self._as_matrix(observations)
+        emissions = self._emission_probabilities(rows)
+        initial = self.initial_probs_ or []
+        transitions = self.transition_matrix_ or []
 
-        scores = np.zeros((len(x), self.n_states), dtype=float)
-        backpointers = np.zeros((len(x), self.n_states), dtype=np.int64)
-        scores[0] = log_initial + log_emissions[0]
-        scores[0] -= logsumexp(scores[0])
+        scores: Matrix = [[0.0 for _ in range(self.n_states)] for _ in rows]
+        backpointers: list[list[int]] = [[0 for _ in range(self.n_states)] for _ in rows]
 
-        for t in range(1, len(x)):
-            candidates = scores[t - 1][:, np.newaxis] + log_transition
-            backpointers[t] = np.argmax(candidates, axis=0)
-            scores[t] = np.max(candidates, axis=0) + log_emissions[t]
-            scores[t] -= logsumexp(scores[t])
+        for state in range(self.n_states):
+            scores[0][state] = math.log(max(initial[state], EPS)) + math.log(max(emissions[0][state], EPS))
+        self._center_log_scores(scores[0])
 
-        path = np.zeros(len(x), dtype=np.int64)
-        path[-1] = int(np.argmax(scores[-1]))
-        for t in range(len(x) - 2, -1, -1):
-            path[t] = backpointers[t + 1, path[t + 1]]
+        for t in range(1, len(rows)):
+            for target in range(self.n_states):
+                candidates = [
+                    scores[t - 1][source] + math.log(max(transitions[source][target], EPS))
+                    for source in range(self.n_states)
+                ]
+                best_source = max(range(self.n_states), key=lambda source: candidates[source])
+                backpointers[t][target] = best_source
+                scores[t][target] = candidates[best_source] + math.log(max(emissions[t][target], EPS))
+            self._center_log_scores(scores[t])
+
+        path = [0 for _ in rows]
+        path[-1] = max(range(self.n_states), key=lambda state: scores[-1][state])
+        for t in range(len(rows) - 2, -1, -1):
+            path[t] = backpointers[t + 1][path[t + 1]]
         return path
 
-    def filter_online(self, observation: ArrayLike, previous_filtered: ArrayLike | None = None) -> FloatArray:
-        """Filter one observation and return normalized state probabilities.
-
-        Args:
-            observation: One observation vector, or a one-element sequence.
-            previous_filtered: Previous normalized state probabilities.  If
-                omitted, the model's initial probabilities are used.
-        """
+    def filter_online(
+        self,
+        observation: Sequence[float] | float,
+        previous_filtered: Sequence[float] | None = None,
+    ) -> Vector:
+        """Filter a single observation."""
         self._check_fitted()
         row = self._as_single_observation(observation)
-        emissions = self._emission_probabilities(row[np.newaxis, :])[0]
+        emissions = self._emission_probabilities([row])[0]
+        transitions = self.transition_matrix_ or []
+
         if previous_filtered is None:
-            prior = self.initial_probs_  # type: ignore[assignment]
+            prior = list(self.initial_probs_ or [])
         else:
-            prior = self._normalize_vector(np.asarray(previous_filtered, dtype=float)) @ self.transition_matrix_  # type: ignore[operator]
-        filtered = np.maximum(prior * emissions, EPS)  # type: ignore[operator]
-        return self._normalize_vector(filtered)
+            previous = self._normalize_vector(previous_filtered)
+            prior = [
+                sum(previous[source] * transitions[source][target] for source in range(self.n_states))
+                for target in range(self.n_states)
+            ]
 
-    def update_transition_matrix(self, posterior_window: ArrayLike) -> FloatArray:
-        """Adapt transition probabilities from a window of posterior rows.
+        return self._normalize_vector([prior[state] * emissions[state] for state in range(self.n_states)])
 
-        The supplied posterior rows are normalized before use.  The updated
-        transition matrix is row-normalized before it is stored and returned.
-        """
+    def update_transition_matrix(self, posterior_window: ArrayLike) -> Matrix:
+        """Update transition probabilities from adjacent posterior rows."""
         self._check_fitted()
-        rows = self._normalize_rows(self._as_matrix(posterior_window))
-        if rows.shape[1] != self.n_states:
+        posterior = self._normalize_rows(self._as_matrix(posterior_window))
+        if any(len(row) != self.n_states for row in posterior):
             raise ValueError("posterior_window must have n_states columns")
 
-        counts = np.full((self.n_states, self.n_states), EPS, dtype=float)
-        for prev, cur in zip(rows[:-1], rows[1:]):
-            counts += np.outer(prev, cur)
+        counts = [[EPS for _ in range(self.n_states)] for _ in range(self.n_states)]
+        for previous, current in zip(posterior[:-1], posterior[1:]):
+            for source in range(self.n_states):
+                for target in range(self.n_states):
+                    counts[source][target] += previous[source] * current[target]
+
         empirical = self._normalize_rows(counts)
-        blended = (1 - self.forgetting_rate) * self.transition_matrix_ + self.forgetting_rate * empirical  # type: ignore[operator]
+        old = self.transition_matrix_ or []
+        blended = [
+            [
+                (1.0 - self.forgetting_rate) * old[source][target]
+                + self.forgetting_rate * empirical[source][target]
+                for target in range(self.n_states)
+            ]
+            for source in range(self.n_states)
+        ]
         self.transition_matrix_ = self._normalize_rows(blended)
         return self.transition_matrix_
 
@@ -237,93 +244,131 @@ class AdaptiveHMM:
         )
 
     def save(self, path: str | Path) -> None:
-        """Save fitted parameters as JSON."""
+        """Save fitted model parameters as JSON."""
         payload = {
             "n_states": self.n_states,
             "covariance_type": self.covariance_type,
             "forgetting_rate": self.forgetting_rate,
             "random_seed": self.random_seed,
-            "initial_probs": None if self.initial_probs_ is None else self.initial_probs_.tolist(),
-            "transition_matrix": None if self.transition_matrix_ is None else self.transition_matrix_.tolist(),
-            "means": None if self.means_ is None else self.means_.tolist(),
-            "variances": None if self.variances_ is None else self.variances_.tolist(),
+            "initial_probs": self.initial_probs_,
+            "transition_matrix": self.transition_matrix_,
+            "means": self.means_,
+            "variances": self.variances_,
         }
         Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     @classmethod
     def load(cls, path: str | Path) -> "AdaptiveHMM":
-        """Load fitted parameters from JSON."""
+        """Load fitted model parameters from JSON."""
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
-        model = cls(payload["n_states"], payload["covariance_type"], payload["forgetting_rate"], payload["random_seed"])
-        model.initial_probs_ = np.asarray(payload["initial_probs"], dtype=float)
-        model.transition_matrix_ = model._normalize_rows(np.asarray(payload["transition_matrix"], dtype=float))
-        model.means_ = np.asarray(payload["means"], dtype=float)
-        model.variances_ = np.maximum(np.asarray(payload["variances"], dtype=float), MIN_VARIANCE)
+        model = cls(
+            n_states=payload["n_states"],
+            covariance_type=payload["covariance_type"],
+            forgetting_rate=payload["forgetting_rate"],
+            random_seed=payload["random_seed"],
+        )
+        model.initial_probs_ = model._normalize_vector(payload["initial_probs"])
+        model.transition_matrix_ = model._normalize_rows(payload["transition_matrix"])
+        model.means_ = [[float(value) for value in row] for row in payload["means"]]
+        model.variances_ = [
+            [max(float(value), MIN_VARIANCE) for value in row]
+            for row in payload["variances"]
+        ]
         return model
 
-    def _initial_labels(self, x: FloatArray) -> IntArray:
-        kmeans = KMeans(n_clusters=self.n_states, n_init=10, random_state=self.random_seed)
-        raw_labels = kmeans.fit_predict(x).astype(np.int64)
-        centers = kmeans.cluster_centers_.mean(axis=1)
-        label_order = np.argsort(centers)
-        remap = {int(old_label): int(new_label) for new_label, old_label in enumerate(label_order)}
-        return np.asarray([remap[int(label)] for label in raw_labels], dtype=np.int64)
+    def _initial_labels(self, rows: Matrix) -> PathVector:
+        scores = [(index, sum(row) / len(row)) for index, row in enumerate(rows)]
+        ordered = sorted(scores, key=lambda item: item[1])
+        labels = [0 for _ in rows]
+        for rank, (index, _) in enumerate(ordered):
+            labels[index] = min(self.n_states - 1, rank * self.n_states // len(rows))
+        return labels
 
-    def _estimate_transition_from_labels(self, labels: IntArray) -> FloatArray:
-        counts = np.ones((self.n_states, self.n_states), dtype=float)
-        for src, dst in zip(labels[:-1], labels[1:]):
-            counts[int(src), int(dst)] += 1.0
+    def _estimate_transition_from_labels(self, labels: PathVector) -> Matrix:
+        counts = [[1.0 for _ in range(self.n_states)] for _ in range(self.n_states)]
+        for source, target in zip(labels[:-1], labels[1:]):
+            counts[source][target] += 1.0
         return self._normalize_rows(counts)
 
-    def _emission_probabilities(self, x: FloatArray) -> FloatArray:
-        """Evaluate diagonal Gaussian emission densities for each row/state."""
+    def _emission_probabilities(self, rows: Matrix) -> Matrix:
         self._check_fitted()
-        variances = np.maximum(self.variances_, MIN_VARIANCE)  # type: ignore[arg-type]
-        diff = x[:, np.newaxis, :] - self.means_[np.newaxis, :, :]  # type: ignore[index]
-        log_det = np.sum(np.log(2.0 * np.pi * variances), axis=1)
-        mahalanobis = np.sum((diff**2) / variances[np.newaxis, :, :], axis=2)
-        log_prob = -0.5 * (log_det[np.newaxis, :] + mahalanobis)
-        log_prob = np.clip(log_prob, np.log(EPS), -np.log(EPS))
-        return np.maximum(np.exp(log_prob), EPS)
+        means = self.means_ or []
+        variances = self.variances_ or []
+        probabilities: Matrix = []
+        for row in rows:
+            row_probs: Vector = []
+            for state in range(self.n_states):
+                log_prob = 0.0
+                for value, mean, variance in zip(row, means[state], variances[state]):
+                    safe_variance = max(variance, MIN_VARIANCE)
+                    log_prob += -0.5 * (
+                        math.log(2.0 * math.pi * safe_variance)
+                        + ((value - mean) ** 2) / safe_variance
+                    )
+                row_probs.append(max(math.exp(max(min(log_prob, -math.log(EPS)), math.log(EPS))), EPS))
+            probabilities.append(row_probs)
+        return probabilities
 
     @staticmethod
-    def _as_matrix(observations: ArrayLike) -> FloatArray:
-        matrix = np.asarray(observations, dtype=float)
-        if matrix.ndim == 1:
-            matrix = matrix.reshape(-1, 1)
-        if matrix.ndim != 2:
-            raise ValueError("observations must be one- or two-dimensional")
-        if matrix.shape[0] == 0:
+    def _as_matrix(observations: ArrayLike) -> Matrix:
+        if not observations:
             raise ValueError("observations must contain at least one row")
-        if not np.all(np.isfinite(matrix)):
+
+        first = observations[0]  # type: ignore[index]
+        if isinstance(first, (int, float)):
+            rows = [[float(value)] for value in observations]  # type: ignore[arg-type]
+        else:
+            rows = [[float(value) for value in row] for row in observations]  # type: ignore[union-attr]
+
+        if not rows or any(not row for row in rows):
+            raise ValueError("observations must contain at least one value per row")
+        width = len(rows[0])
+        if any(len(row) != width for row in rows):
+            raise ValueError("observations must have consistent row widths")
+        if any(not math.isfinite(value) for row in rows for value in row):
             raise ValueError("observations must be finite")
-        return matrix.astype(float, copy=False)
+        return rows
 
-    def _as_single_observation(self, observation: ArrayLike) -> FloatArray:
-        row = np.asarray(observation, dtype=float)
-        if row.ndim == 0:
-            row = row.reshape(1)
-        elif row.ndim == 2 and row.shape[0] == 1:
-            row = row.reshape(-1)
-        elif row.ndim != 1:
-            raise ValueError("observation must be a single one-dimensional observation")
-        if self.means_ is not None and row.shape[0] != self.means_.shape[1]:
+    def _as_single_observation(self, observation: Sequence[float] | float) -> Vector:
+        if isinstance(observation, (int, float)):
+            row = [float(observation)]
+        else:
+            row = [float(value) for value in observation]
+        if self.means_ is not None and len(row) != len(self.means_[0]):
             raise ValueError("observation feature count does not match fitted model")
-        if not np.all(np.isfinite(row)):
+        if not row or any(not math.isfinite(value) for value in row):
             raise ValueError("observation must be finite")
-        return row.astype(float, copy=False)
+        return row
 
     @staticmethod
-    def _normalize_vector(values: ArrayLike) -> FloatArray:
-        vector = np.maximum(np.asarray(values, dtype=float), EPS)
-        total = max(float(vector.sum()), EPS)
-        return vector / total
+    def _column_means(rows: Matrix) -> Vector:
+        width = len(rows[0])
+        return [sum(row[column] for row in rows) / len(rows) for column in range(width)]
 
     @staticmethod
-    def _normalize_rows(values: ArrayLike) -> FloatArray:
-        rows = np.maximum(np.asarray(values, dtype=float), EPS)
-        totals = np.maximum(rows.sum(axis=1, keepdims=True), EPS)
-        return rows / totals
+    def _column_variances(rows: Matrix, means: Sequence[float]) -> Vector:
+        return [
+            max(sum((row[column] - means[column]) ** 2 for row in rows) / len(rows), MIN_VARIANCE)
+            for column in range(len(means))
+        ]
+
+    @staticmethod
+    def _normalize_vector(values: Sequence[float]) -> Vector:
+        vector = [max(float(value), EPS) for value in values]
+        total = max(sum(vector), EPS)
+        return [value / total for value in vector]
+
+    @classmethod
+    def _normalize_rows(cls, values: Sequence[Sequence[float]]) -> Matrix:
+        return [cls._normalize_vector(row) for row in values]
+
+    @staticmethod
+    def _center_log_scores(scores: Vector) -> None:
+        largest = max(scores)
+        total = sum(math.exp(score - largest) for score in scores)
+        log_total = largest + math.log(max(total, EPS))
+        for index, score in enumerate(scores):
+            scores[index] = score - log_total
 
     def _check_fitted(self) -> None:
         if (

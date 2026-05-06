@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = [
+    "setuptools @ file:///root/.pyenv/versions/3.10.19/lib/python3.10/ensurepip/_bundled/setuptools-79.0.1-py3-none-any.whl",
+    "wheel @ file:///root/.local/share/pipx/venvs/poetry/lib/python3.12/site-packages/virtualenv/seed/wheels/embed/wheel-0.45.1-py3-none-any.whl",
+]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,25 +11,13 @@ version = "0.1.0"
 description = "Research prototype for latent behavioral stress regime detection in aggregate economic traces."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
-dependencies = [
-    "numpy",
-    "pandas",
-    "scipy",
-    "scikit-learn",
-    "statsmodels",
-    "pydantic",
-    "PyYAML",
-    "joblib",
-    "tqdm",
-    "plotly",
-    "streamlit",
-]
+license = { text = "MIT" }
+dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff"]
-langflow = ["langflow"]
-advanced = ["umap-learn", "ruptures", "xgboost"]
+dev = []
+langflow = []
+advanced = []
 
 [tool.setuptools.packages.find]
 where = ["src"]
