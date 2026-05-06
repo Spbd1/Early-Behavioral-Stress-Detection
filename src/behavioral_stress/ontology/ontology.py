@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from behavioral_stress.simple_frame import DataFrame
+import pandas as pd
 import yaml
 
 REQUIRED_CODEBOOK_COLUMNS = [
@@ -51,9 +51,9 @@ class BehavioralOntology:
     def __init__(self, signals: list[BehavioralSignal]) -> None:
         self.signals = signals
 
-    def to_dataframe(self) -> DataFrame:
+    def to_dataframe(self) -> pd.DataFrame:
         """Return ontology signals as a codebook table."""
-        return DataFrame([signal.to_dict() for signal in self.signals])
+        return pd.DataFrame([signal.to_dict() for signal in self.signals])
 
     def to_dict(self) -> dict[str, Any]:
         """Return dictionary payload for serialization."""
@@ -113,7 +113,7 @@ def default_ontology(n_features: int = 9, freq: str = "D") -> BehavioralOntology
     return BehavioralOntology(signals)
 
 
-def validate_codebook(codebook: DataFrame) -> bool:
+def validate_codebook(codebook: pd.DataFrame) -> bool:
     """Validate that a codebook contains required columns and valid ontology levels."""
     missing = [column for column in REQUIRED_CODEBOOK_COLUMNS if column not in codebook.columns]
     if missing:
