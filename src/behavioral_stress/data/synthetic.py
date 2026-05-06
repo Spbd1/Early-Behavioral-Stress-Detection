@@ -5,18 +5,19 @@ from dataclasses import dataclass
 import random
 from typing import Any
 
+import pandas as pd
+
 from behavioral_stress.ontology.signal_codebook import build_default_codebook
-from behavioral_stress.simple_frame import DataFrame, Series
 
 
 @dataclass
 class SyntheticRegimeData:
     """Container for generated observations, covariates, latent states, and metadata."""
 
-    observations: DataFrame
-    covariates: DataFrame
-    latent_states: Series
-    codebook: DataFrame
+    observations: pd.DataFrame
+    covariates: pd.DataFrame
+    latent_states: pd.Series
+    codebook: pd.DataFrame
     metadata: dict[str, Any]
 
 
@@ -38,7 +39,7 @@ def generate_synthetic_regime_data(
     for _ in range(1, n_steps):
         states.append(_sample_categorical(rng, transition[states[-1]]))
 
-    index = [f"t_{step:04d}" for step in range(n_steps)]
+    index = pd.date_range(start=start_date, periods=n_steps, freq=freq)
     observations: list[list[float]] = []
     covariates: list[list[float]] = []
     for step, state in enumerate(states):
@@ -68,9 +69,9 @@ def generate_synthetic_regime_data(
         "warning": "Synthetic aggregate research data only; not a diagnostic or recession forecast.",
     }
     return SyntheticRegimeData(
-        observations=DataFrame(observations, columns=obs_cols, index=index),
-        covariates=DataFrame(covariates, columns=cov_cols, index=index),
-        latent_states=Series(states, index=index, name="latent_state"),
+        observations=pd.DataFrame(observations, columns=obs_cols, index=index),
+        covariates=pd.DataFrame(covariates, columns=cov_cols, index=index),
+        latent_states=pd.Series(states, index=index, name="latent_state"),
         codebook=build_default_codebook(n_features=n_features, freq=freq),
         metadata=metadata,
     )
