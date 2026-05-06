@@ -9,22 +9,24 @@ description = "Research prototype for latent behavioral stress regime detection 
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
-authors = [{name = "Research Prototype Contributors"}]
-keywords = ["hidden-markov-model", "synthetic-data", "behavioral-ontology", "research-prototype"]
 dependencies = [
-    "numpy>=1.24",
-    "pandas>=2.0",
-    "scipy>=1.10",
-    "scikit-learn>=1.3",
-    "statsmodels>=0.14",
-    "PyYAML>=6.0",
+    "numpy",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+    "statsmodels",
+    "pydantic",
+    "PyYAML",
+    "joblib",
+    "tqdm",
+    "plotly",
+    "streamlit",
 ]
 
 [project.optional-dependencies]
-langflow = []
-dashboard = []
-advanced = []
-dev = ["pytest>=7.4", "ruff>=0.4"]
+dev = ["pytest", "ruff"]
+langflow = ["langflow"]
+advanced = ["umap-learn", "ruptures", "xgboost"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -33,7 +35,3 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra"
-
-[tool.ruff]
-line-length = 100
-src = ["src", "tests", "scripts"]
