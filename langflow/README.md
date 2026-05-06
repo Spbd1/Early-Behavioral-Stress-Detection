@@ -1,31 +1,45 @@
 # Langflow Workflow
 
-This scaffold orchestrates the synthetic aggregate latent-regime pipeline:
+This scaffold documents a Langflow import for the synthetic aggregate behavioral-stress research pipeline:
 
-Input Config → Synthetic Data Generator → Preprocessing / Standardization → Ontology Signal Codebook → Adaptive HMM Fit + Predict → Validation Metrics → Report / Output Files → Optional Dashboard Launch Instructions.
+`config` → `synthetic_data` → `preprocessing` → `ontology` → `adaptive_hmm` → `metrics` → `report`
 
-## Installation
+The custom components are thin wrappers around the existing package functions/classes. They are not a second implementation of the modeling workflow.
+
+## Install Langflow extras
+
+From the repository root, install the project with the Langflow optional dependencies:
 
 ```bash
 pip install -e .[langflow]
 ```
 
-## Run Langflow
+## Start Langflow
+
+Run Langflow from the same environment:
 
 ```bash
 langflow run
 ```
 
-## Import
+## Import the scaffold flow
 
-- Open the Langflow UI.
-- Import `langflow/behavioral_stress_flow.json`.
-- Add custom components from `langflow/custom_components/`.
-- Run the flow with `configs/synthetic.yaml`.
+1. Open the Langflow UI shown by `langflow run`.
+2. Import `langflow/behavioral_stress_flow.json`.
+3. Add custom components from `langflow/custom_components/`:
+   - `synthetic_data_component.py`
+   - `preprocessing_component.py`
+   - `ontology_signal_component.py`
+   - `adaptive_hmm_component.py`
+   - `validation_metrics_component.py`
+   - `report_component.py`
+4. Use `configs/synthetic.yaml` for the config input.
 
-If exact Langflow schema behavior changes, the JSON remains a best-effort import scaffold and the Python package remains the source of truth.
+Langflow component APIs can change across releases, so this file is a scaffold for wiring the package workflow in the UI. The source of truth remains the Python package and scripts.
 
-## Fallback
+## Fallback command
+
+If Langflow import or component loading is unavailable, run the equivalent package workflow directly:
 
 ```bash
 python scripts/run_synthetic_demo.py --config configs/synthetic.yaml

@@ -1,23 +1,83 @@
 {
   "name": "behavioral_stress_synthetic_workflow",
-  "description": "Synthetic aggregate latent-regime research workflow: config to data, preprocessing, ontology, AdaptiveHMM, metrics, and report files.",
+  "description": "Langflow scaffold for the synthetic aggregate latent-regime research workflow: config to synthetic_data, preprocessing, ontology, adaptive_hmm, metrics, and report.",
   "nodes": [
-    {"id": "config", "type": "input_config", "label": "Input Config", "config_path": "configs/synthetic.yaml"},
-    {"id": "synthetic_data", "type": "custom_component", "component": "SyntheticDataComponent"},
-    {"id": "preprocessing", "type": "custom_component", "component": "PreprocessingComponent"},
-    {"id": "ontology", "type": "custom_component", "component": "OntologySignalComponent"},
-    {"id": "adaptive_hmm", "type": "custom_component", "component": "AdaptiveHMMComponent"},
-    {"id": "metrics", "type": "custom_component", "component": "ValidationMetricsComponent"},
-    {"id": "report", "type": "custom_component", "component": "ReportComponent"}
+    {
+      "id": "config",
+      "type": "input_config",
+      "label": "config",
+      "config_path": "configs/synthetic.yaml"
+    },
+    {
+      "id": "synthetic_data",
+      "type": "custom_component",
+      "label": "synthetic_data",
+      "component": "SyntheticDataComponent",
+      "file": "langflow/custom_components/synthetic_data_component.py"
+    },
+    {
+      "id": "preprocessing",
+      "type": "custom_component",
+      "label": "preprocessing",
+      "component": "PreprocessingComponent",
+      "file": "langflow/custom_components/preprocessing_component.py"
+    },
+    {
+      "id": "ontology",
+      "type": "custom_component",
+      "label": "ontology",
+      "component": "OntologySignalComponent",
+      "file": "langflow/custom_components/ontology_signal_component.py"
+    },
+    {
+      "id": "adaptive_hmm",
+      "type": "custom_component",
+      "label": "adaptive_hmm",
+      "component": "AdaptiveHMMComponent",
+      "file": "langflow/custom_components/adaptive_hmm_component.py"
+    },
+    {
+      "id": "metrics",
+      "type": "custom_component",
+      "label": "metrics",
+      "component": "ValidationMetricsComponent",
+      "file": "langflow/custom_components/validation_metrics_component.py"
+    },
+    {
+      "id": "report",
+      "type": "custom_component",
+      "label": "report",
+      "component": "ReportComponent",
+      "file": "langflow/custom_components/report_component.py"
+    }
   ],
   "edges": [
-    ["config", "synthetic_data"],
-    ["synthetic_data", "preprocessing"],
-    ["preprocessing", "ontology"],
-    ["ontology", "adaptive_hmm"],
-    ["adaptive_hmm", "metrics"],
-    ["metrics", "report"]
+    {
+      "source": "config",
+      "target": "synthetic_data"
+    },
+    {
+      "source": "synthetic_data",
+      "target": "preprocessing"
+    },
+    {
+      "source": "preprocessing",
+      "target": "ontology"
+    },
+    {
+      "source": "ontology",
+      "target": "adaptive_hmm"
+    },
+    {
+      "source": "adaptive_hmm",
+      "target": "metrics"
+    },
+    {
+      "source": "metrics",
+      "target": "report"
+    }
   ],
   "fallback_runner": "behavioral_stress.workflows.synthetic_workflow:run_synthetic_workflow",
+  "fallback_command": "python scripts/run_synthetic_demo.py --config configs/synthetic.yaml",
   "responsible_use_warning": "Experimental research prototype. Not a validated recession predictor. Aggregate-level inference only."
 }
