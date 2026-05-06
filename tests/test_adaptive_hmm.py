@@ -1,26 +1,34 @@
-import numpy as np
+import math
 
-from behavioral_stress.data.preprocessing import standardize_frame
-from behavioral_stress.data.synthetic import generate_synthetic_regime_data
 from behavioral_stress.models.adaptive_hmm import AdaptiveHMM
 
 
+def _row_sums(matrix):
+    return [sum(row) for row in matrix]
+
+
+def _all_close(values, target, tolerance=1e-9):
+    return all(abs(value - target) <= tolerance for value in values)
+
+
 def test_adaptive_hmm_probabilities_and_paths():
-    data = generate_synthetic_regime_data(n_steps=80, random_seed=7)
-    x = standardize_frame(data.observations).values
-    model = AdaptiveHMM(n_states=3, random_seed=7).fit(x)
+    observations = [
+        [index / 10.0, (index % 5) / 5.0]
+        for index in range(80)
+    ]
+    model = AdaptiveHMM(n_states=3, random_seed=7).fit(observations)
 
-    assert np.allclose(model.transition_matrix_.sum(axis=1), 1.0)
+    assert _all_close(_row_sums(model.transition_matrix_), 1.0)
 
-    filtered, scales, log_likelihood = model.forward(x)
-    posterior = model.smooth(x)
-    path = model.viterbi(x)
+    filtered, scales, log_likelihood = model.forward(observations)
+    posterior = model.smooth(observations)
+    path = model.viterbi(observations)
 
-    assert np.allclose(filtered.sum(axis=1), 1.0)
-    assert np.allclose(posterior.sum(axis=1), 1.0)
-    assert len(path) == len(x)
-    assert np.isfinite(log_likelihood)
-    assert np.all(scales > 0)
+    assert _all_close(_row_sums(filtered), 1.0)
+    assert _all_close(_row_sums(posterior), 1.0)
+    assert len(path) == len(observations)
+    assert math.isfinite(log_likelihood)
+    assert all(scale > 0 for scale in scales)
 
     model.update_transition_matrix(posterior[-20:])
-    assert np.allclose(model.transition_matrix_.sum(axis=1), 1.0)
+    assert _all_close(_row_sums(model.transition_matrix_), 1.0)
