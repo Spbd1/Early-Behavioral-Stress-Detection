@@ -8,10 +8,74 @@ module remains importable before optional scientific dependencies are present.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib
 import json
 import math
 from pathlib import Path
 from typing import Sequence
+
+
+class _FiniteResult:
+    def __init__(self, values: list[list[bool]]) -> None:
+        self._values = values
+
+    def all(self) -> bool:
+        return all(value for row in self._values for value in row)
+
+
+class _ArrayCompat:
+    def __init__(self, values: object) -> None:
+        self._rows, self.ndim, self.shape = self._coerce(values)
+
+    @staticmethod
+    def _coerce(values: object) -> tuple[list[list[float]], int, tuple[int, ...]]:
+        if isinstance(values, (str, bytes)) or not hasattr(values, "__iter__"):
+            return [], 0, ()
+
+        sequence = list(values)  # type: ignore[arg-type]
+        if not sequence:
+            return [], 1, (0,)
+
+        first = sequence[0]
+        if isinstance(first, (str, bytes)):
+            raise ValueError("could not convert string to float")
+        if hasattr(first, "__iter__"):
+            rows = [[float(value) for value in row] for row in sequence]  # type: ignore[union-attr]
+            if any(len(row) != len(rows[0]) for row in rows):
+                raise ValueError("observations must have consistent row widths")
+            return rows, 2, (len(rows), len(rows[0]))
+
+        rows = [[float(value)] for value in sequence]
+        return rows, 1, (len(rows),)
+
+    def reshape(self, rows: int, columns: int) -> "_ArrayCompat":
+        if (rows, columns) != (-1, 1):
+            raise ValueError("compatibility array only supports reshape(-1, 1)")
+        reshaped = _ArrayCompat([])
+        reshaped._rows = self._rows
+        reshaped.ndim = 2
+        reshaped.shape = (len(self._rows), 1)
+        return reshaped
+
+    def tolist(self) -> list[list[float]]:
+        return [list(row) for row in self._rows]
+
+
+class _NumpyCompat:
+    @staticmethod
+    def asarray(values: object, dtype: type[float] = float) -> _ArrayCompat:
+        del dtype
+        return _ArrayCompat(values)
+
+    @staticmethod
+    def isfinite(values: _ArrayCompat) -> _FiniteResult:
+        return _FiniteResult([[math.isfinite(value) for value in row] for row in values.tolist()])
+
+
+if importlib.util.find_spec("numpy") is not None:
+    np = importlib.import_module("numpy")
+else:
+    np = _NumpyCompat()
 
 EPS = 1e-12
 MIN_VARIANCE = 1e-6
@@ -311,23 +375,27 @@ class AdaptiveHMM:
 
     @staticmethod
     def _as_matrix(observations: ArrayLike) -> Matrix:
-        if not observations:
-            raise ValueError("observations must contain at least one row")
+        if observations is None:
+            raise ValueError("observations must not be None")
 
-        first = observations[0]  # type: ignore[index]
-        if isinstance(first, (int, float)):
-            rows = [[float(value)] for value in observations]  # type: ignore[arg-type]
+        if hasattr(observations, "to_numpy"):
+            rows = observations.to_numpy(dtype=float)  # type: ignore[attr-defined]
+            if not hasattr(rows, "ndim"):
+                rows = np.asarray(rows, dtype=float)
         else:
-            rows = [[float(value) for value in row] for row in observations]  # type: ignore[union-attr]
+            rows = np.asarray(observations, dtype=float)
 
-        if not rows or any(not row for row in rows):
-            raise ValueError("observations must contain at least one value per row")
-        width = len(rows[0])
-        if any(len(row) != width for row in rows):
-            raise ValueError("observations must have consistent row widths")
-        if any(not math.isfinite(value) for row in rows for value in row):
+        if rows.ndim == 1:
+            rows = rows.reshape(-1, 1)
+        if rows.ndim != 2:
+            raise ValueError("observations must be a 2D array")
+        if rows.shape[0] < 1:
+            raise ValueError("observations must contain at least one row")
+        if rows.shape[1] < 1:
+            raise ValueError("observations must contain at least one feature")
+        if not np.isfinite(rows).all():
             raise ValueError("observations must be finite")
-        return rows
+        return rows.tolist()
 
     def _as_single_observation(self, observation: Sequence[float] | float) -> Vector:
         if isinstance(observation, (int, float)):
