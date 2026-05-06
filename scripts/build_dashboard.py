@@ -1,22 +1,19 @@
 #!/usr/bin/env python
-"""Print instructions for launching the Streamlit dashboard."""
+"""Print dashboard launch instructions for the research prototype."""
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
-import typer
 
-from behavioral_stress.utils.config import load_config
-
-app = typer.Typer(add_completion=False)
-
-
-@app.command()
-def main(config: Path = typer.Option(Path("configs/default.yaml"), "--config")) -> None:
-    """Validate dashboard config and show the Streamlit command."""
-    load_config(config)
-    typer.echo("Run: streamlit run src/behavioral_stress/visualization/dashboard.py")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Show dashboard launch command")
+    parser.add_argument("--config", type=Path, default=Path("configs/default.yaml"))
+    args = parser.parse_args()
+    print("Experimental research prototype. Not a validated recession predictor. Aggregate-level inference only.")
+    print(f"Using config: {args.config}")
+    print("Run: streamlit run src/behavioral_stress/visualization/dashboard.py")
 
 
 if __name__ == "__main__":
-    app()
+    main()

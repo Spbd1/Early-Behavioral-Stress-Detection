@@ -1,7 +1,15 @@
-"""Langflow custom component scaffold for ontology-guided signals."""
-from behavioral_stress.ontology.ontology import default_ontology
+"""Langflow wrapper for ontology signal-codebook validation."""
+from __future__ import annotations
+
+from behavioral_stress.ontology.ontology import validate_codebook
 
 
-def load_default_ontology(n_features: int = 9):
-    """Return the default synthetic signal ontology."""
-    return default_ontology(n_features)
+class OntologySignalComponent:
+    """Validate and forward the ontology-derived codebook."""
+
+    display_name = "Ontology Signal Codebook"
+
+    def run(self, payload: dict) -> dict:
+        validate_codebook(payload["data"].codebook)
+        payload["codebook_valid"] = True
+        return payload

@@ -1,21 +1,23 @@
 {
-  "name": "Behavioral Stress Research Flow",
-  "description": "Input Config -> Data Loader -> Preprocessing -> Ontology Signal Generator -> Adaptive HMM -> Validation Metrics -> Visualization / Report",
+  "name": "behavioral_stress_synthetic_workflow",
+  "description": "Synthetic aggregate latent-regime research workflow: config to data, preprocessing, ontology, AdaptiveHMM, metrics, and report files.",
   "nodes": [
-    {"id": "config", "type": "Input Config"},
-    {"id": "data_loader", "type": "Synthetic or Processed Data Loader"},
-    {"id": "preprocessing", "type": "Preprocessing"},
-    {"id": "ontology", "type": "Ontology Signal Generator"},
-    {"id": "adaptive_hmm", "type": "Adaptive HMM"},
-    {"id": "metrics", "type": "Validation Metrics"},
-    {"id": "report", "type": "Visualization / Report"}
+    {"id": "config", "type": "input_config", "label": "Input Config", "config_path": "configs/synthetic.yaml"},
+    {"id": "synthetic_data", "type": "custom_component", "component": "SyntheticDataComponent"},
+    {"id": "preprocessing", "type": "custom_component", "component": "PreprocessingComponent"},
+    {"id": "ontology", "type": "custom_component", "component": "OntologySignalComponent"},
+    {"id": "adaptive_hmm", "type": "custom_component", "component": "AdaptiveHMMComponent"},
+    {"id": "metrics", "type": "custom_component", "component": "ValidationMetricsComponent"},
+    {"id": "report", "type": "custom_component", "component": "ReportComponent"}
   ],
   "edges": [
-    ["config", "data_loader"],
-    ["data_loader", "preprocessing"],
+    ["config", "synthetic_data"],
+    ["synthetic_data", "preprocessing"],
     ["preprocessing", "ontology"],
     ["ontology", "adaptive_hmm"],
     ["adaptive_hmm", "metrics"],
     ["metrics", "report"]
-  ]
+  ],
+  "fallback_runner": "behavioral_stress.workflows.synthetic_workflow:run_synthetic_workflow",
+  "responsible_use_warning": "Experimental research prototype. Not a validated recession predictor. Aggregate-level inference only."
 }

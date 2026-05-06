@@ -1,10 +1,25 @@
 services:
-  behavioral-stress:
+  research-demo:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     volumes:
-      - ..:/app
-    environment:
-      - PYTHONPATH=/app/src
+      - ../data:/app/data
     command: python scripts/run_synthetic_demo.py --config configs/synthetic.yaml
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    volumes:
+      - ../data:/app/data
+    ports:
+      - "8501:8501"
+    command: streamlit run src/behavioral_stress/visualization/dashboard.py --server.address=0.0.0.0
+  langflow:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    profiles: ["langflow"]
+    ports:
+      - "7860:7860"
+    command: sh -c "pip install '.[langflow]' && langflow run --host 0.0.0.0"
