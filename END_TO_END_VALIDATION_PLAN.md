@@ -239,3 +239,24 @@ Acceptance criteria:
 - Live ingestion fails early with a clear optional-dependency message if pytrends is absent.
 - Dry-run output contains provider-shaped raw CSV files, processed long-format panel files, and metadata JSON.
 - Metadata preserves geography fields and warnings, and documentation states that raw Google Trends values should not be naively compared across regions.
+
+## Dashboard/API/static frontend validation addendum — 2026-05-07
+
+The dashboard validation path now includes a focused schema/static-frontend contract gate:
+
+1. Build or load dashboard payload data with `build_dashboard_payload` or `scripts/build_frontend_data.py`.
+2. Validate the payload with the built-in dashboard schema validator before writing static JSON.
+3. Assert that canonical warning groups (`data_quality`, `drift`, `geo_reliability`) match the fields consumed by the frontend.
+4. Assert that BSI rows, alert rows, geo comparison rows, report metadata, and static-mode metadata are present and JSON-serializable.
+5. Run the frontend smoke test to confirm the UI includes experimental labeling, no recession-forecast claim, static JSON fallback, report export, geo warnings, and no explicitly blocked experimental browser APIs.
+
+Commands for this gate:
+
+```bash
+python -m compileall src scripts tests
+pytest tests/test_dashboard_schema.py tests/test_frontend_static.py tests/test_ops_hardening.py
+python scripts/build_frontend_data.py --output /tmp/dashboard.json
+python -m http.server 8080 --directory frontend
+```
+
+Chrome static-mode note: use a static file server for `frontend/index.html` and generated `frontend/dashboard.json`; direct `file://` loading is not part of the validation target because Chrome can block local `fetch` requests.

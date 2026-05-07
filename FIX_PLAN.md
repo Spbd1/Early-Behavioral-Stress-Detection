@@ -428,3 +428,29 @@ Status on 2026-05-07: implemented for offline reliability and testability only.
 - Validate every raw CSV, processed panel CSV, and metadata JSON emitted by the ingestion run before returning artifact paths.
 - Preserve geography metadata and warnings in run metadata, including unsupported/city/low-volume caveats.
 - Avoid overclaiming pytrends reliability; all live-provider behavior remains experimental and must be separately validated.
+
+## Dashboard/API/frontend consistency fixes — completed 2026-05-07
+
+Scope completed: dashboard JSON schema, backend/frontend field consistency, Chrome-friendly static mode, and frontend smoke coverage.
+
+Implemented fixes:
+
+- Added an explicit dashboard payload contract (`schema_version=dashboard.v1`) with a dependency-free validator covering BSI rows, alert rows, geo comparison metadata, canonical warning groups, reports, and static-mode metadata.
+- Kept backend/frontend aliases consistent by emitting both canonical warning groups under `warnings` and frontend-compatible fields (`quality_warnings`, `drift_warnings`, `geo_reliability_warnings`).
+- Added report export metadata under `reports` and preserved `report` as the frontend-compatible primary report object.
+- Added static-mode metadata documenting that generated `frontend/dashboard.json` does not require the API backend.
+- Updated the frontend to normalize API and static JSON payloads, render data-quality/drift/geo reliability warnings, avoid unsafe JSON-driven `innerHTML`, display the experimental/not-recession-prediction guardrail, and export report JSON from both modes.
+- Added frontend smoke checks for required controls, static fallback, report export, geo warnings, and avoidance of unsupported experimental browser APIs.
+
+Validation evidence:
+
+- `python -m compileall src scripts tests`
+- `pytest tests/test_dashboard_schema.py tests/test_frontend_static.py tests/test_ops_hardening.py`
+- `python scripts/build_frontend_data.py --output /tmp/dashboard.json`
+
+Deferred after this narrow fix:
+
+- Real provider/live-data validation.
+- Calibrated BSI thresholds and prospective alert validation.
+- Full browser automation in Chrome/Selenium/Playwright.
+- Production map rendering or geospatial visualization beyond the inspectable static table/placeholder.

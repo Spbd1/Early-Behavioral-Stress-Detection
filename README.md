@@ -237,7 +237,7 @@ python scripts/build_frontend_data.py --config configs/production.experimental.y
 python -m http.server 8080 --directory frontend
 ```
 
-The UI supports country, region/province/state, city/metro, time-range, and keyword-family filters; BSI-like synthetic demo and HMM posterior charts; alert timeline; top contributing signals; geo comparison table/map placeholder; report viewer; data-quality warnings; drift warnings; and report export. It is intentionally labeled as experimental, is currently synthetic/demo-oriented, and avoids claims of recession prediction.
+The UI supports country, region/province/state, city/metro, time-range, and keyword-family filters; BSI-like synthetic demo and HMM posterior charts; alert timeline; top contributing signals; geo comparison table/map placeholder; report viewer; data-quality warnings; drift warnings; geo reliability warnings; and report export. It is intentionally labeled as experimental, is currently synthetic/demo-oriented, and avoids claims of recession prediction. Static mode uses generated `frontend/dashboard.json` and does not require the dashboard API backend, but Chrome users should serve the `frontend/` directory with a static file server rather than opening `index.html` directly from `file://` because local fetches can be blocked by the browser.
 
 ### Operations docs
 

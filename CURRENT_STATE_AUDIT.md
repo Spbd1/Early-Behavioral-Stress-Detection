@@ -328,3 +328,19 @@ Completed on 2026-05-07:
 - Run metadata now preserves geography metadata for country/region/city-style inputs, records unsupported or low-volume geography warnings, and repeats the limitation that raw Google Trends values are scaled within each request and must not be naively compared across regions.
 
 Still deferred: live Google Trends reliability claims, provider terms/legal review, scheduled live operation, and calibrated use of real-world Google Trends signals.
+
+## Dashboard/API/static frontend consistency update
+
+Completed on 2026-05-07 for the dashboard/API/frontend scope only:
+
+- The browser dashboard payload now has an explicit `dashboard.v1` schema version, experimental system metadata, a not-recession-prediction claim guardrail, canonical warning groups, geo metadata, report export metadata, and static-mode metadata stating that no backend is required when `frontend/dashboard.json` is generated.
+- Backend payload aliases used by the frontend (`quality_warnings`, `drift_warnings`, `geo_reliability_warnings`, `report`, and `locations`) are kept in sync with canonical fields so the API-backed and generated-static paths render the same fields.
+- A dependency-free schema validator and pytest snapshot-style contract check now cover BSI rows, alerts, geo comparison rows, warning groups, reports, and static-mode behavior.
+- The frontend now displays data-quality, drift, and geo reliability warnings, labels the page as experimental, repeats the not-recession-prediction guardrail from the payload, and exports a JSON report in static or API-backed mode.
+- The static frontend remains framework-free and uses broadly supported Chrome APIs (`fetch`, canvas, `Blob`, and `URL.createObjectURL`) while avoiding known experimental browser APIs in the smoke test.
+
+Still not claimed:
+
+- The browser dashboard remains synthetic/demo-oriented and does not validate real-world monitoring, calibrated BSI thresholds, or recession prediction.
+- The geo comparison display is a reliability-aware synthetic table/placeholder, not a validated map product.
+- A static file server such as `python -m http.server --directory frontend` is still recommended for Chrome static mode; opening `index.html` directly from `file://` may be blocked by browser fetch restrictions.

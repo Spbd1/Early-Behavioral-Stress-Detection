@@ -115,3 +115,23 @@ Not completed / not claimed:
 - No live Google Trends integration validation.
 - No secrets or credentials added.
 - No production reliability guarantee for pytrends.
+
+## Dashboard/API/static frontend consistency milestone — completed 2026-05-07
+
+Status: completed for the requested dashboard/API/frontend consistency scope.
+
+Evidence added:
+
+- `dashboard.v1` payload schema/version plus dependency-free validation.
+- Snapshot-style pytest coverage for BSI, alerts, geo metadata, warning groups, reports, and static-mode metadata.
+- Frontend normalization for API-backed and generated-static JSON payloads.
+- UI display for experimental labeling, not-recession-prediction guardrail, data-quality warnings, drift warnings, and geo reliability warnings.
+- Static JSON report export remains available without requiring the dashboard API backend.
+- Chrome-friendly smoke test blocks known experimental browser API usage.
+
+Not completed / not claimed:
+
+- Live Google Trends validation.
+- Production-calibrated BSI or alert thresholds.
+- Full browser automation with a real Chrome instance.
+- Validated geospatial map rendering.
