@@ -4,7 +4,7 @@ Research prototype for **“Detecting Early Behavioral Stress Regimes in Economi
 
 **This project is an experimental research prototype. It is not a validated recession predictor, not a production forecasting system, and not a tool for individual behavioral diagnosis or policy prescription.**
 
-The default demo uses synthetic aggregate-level traces with known latent regimes. The code is intended for cautious synthetic validation of latent regime detection methods, behavioral signal ontologies, and workflow orchestration.
+The validated runnable demo remains synthetic: it uses synthetic aggregate-level traces with known latent regimes. The code is intended for cautious synthetic validation of latent regime detection methods, behavioral signal ontologies, and workflow orchestration. Real Google Trends ingestion is experimental and is not part of the validated default demo.
 
 ## What it is
 
@@ -74,7 +74,7 @@ python scripts/build_dashboard.py --config configs/default.yaml
 streamlit run src/behavioral_stress/visualization/dashboard.py
 ```
 
-The dashboard displays the warning banner, posterior regime probabilities, Viterbi path, synthetic latent truth when available, ontology-coded observations, transition matrix, metrics, and placeholders for KL drift diagnostics.
+The validated dashboard path is synthetic/demo-only. It displays the warning banner, posterior regime probabilities, Viterbi path, synthetic latent truth when available, ontology-coded observations, transition matrix, metrics, and placeholders for KL drift diagnostics. It must not be read as validated real-world monitoring.
 
 ## Langflow workflow
 
@@ -102,22 +102,23 @@ mitigations, and provider-geography limitations.
 
 ## Google Trends ingestion
 
-This repository now includes a reusable Google Trends ingestion layer for aggregate,
-keyword-level `interest_over_time` data. Install the optional connector dependency before live
-collection:
+**Experimental status:** Real Google Trends ingestion is an experimental, optional research path. It is not part of the validated synthetic demo and should not be treated as production-ready data collection.
+
+This repository includes a Google Trends ingestion layer for aggregate, keyword-level
+`interest_over_time` data, but live provider behavior remains unvalidated and subject to provider changes. Install the optional connector dependency before experimental live collection:
 
 ```bash
 pip install -e .[ingestion]
 ```
 
-Run the sample pipeline with either entry point:
+Run the experimental sample pipeline with either entry point:
 
 ```bash
 behavioral-stress-ingest google-trends --config configs/ingestion/google_trends_sample.yaml
 python scripts/run_google_trends_ingestion.py --config configs/ingestion/google_trends_sample.yaml
 ```
 
-The ingestion architecture intentionally separates provider coupling from durable artifacts:
+The experimental ingestion architecture intentionally separates provider coupling from durable artifacts:
 
 - `behavioral_stress.ingestion.config` loads typed YAML settings for keywords, regions,
   historical windows, retries, rate limits, cache TTLs, storage locations, and quality gates.
@@ -156,6 +157,14 @@ because the anchor itself is still a Google-rescaled sampled series. Additional 
 from cache-backed replay, overlap-based incremental updates, raw artifact retention, and explicit
 quality flags for sparse, missing, nonpositive-anchor, or high-variation anchor batches.
 
+## Behavioral Stress Index (BSI) status
+
+The implemented `behavioral_stress.alerting.bsi.BehavioralStressIndex` is an **Implemented MVP BSI**, not the complete design in `BSI_DESIGN.md`. It accepts already-normalized component scores and returns a conservative research/demo payload containing `score`, `severity_band`, `uncertainty_band`, MVP `reliability_score`, `top_contributing_signals`, `limitations`, `warnings`, an `implementation_label`, and component values.
+
+Implemented in the MVP: fixed heuristic weighting of HMM posterior, anomaly strength, signal breadth, persistence, trend acceleration, data quality, drift confidence, geographic confidence; conservative severity bands; top contributors; safety limitations and warnings.
+
+Deferred from the fuller design: local rolling baselines from raw provider panels, seasonality/holiday/event adjustment, calibrated confidence intervals, volume-aware geographic reliability estimation, persistent alert history, and transform/weight/calibration lineage metadata. `BSI_DESIGN.md` remains a design-only specification. The MVP BSI is experimental aggregate monitoring support, **not a recession prediction mechanism**.
+
 ## Docker
 
 From the repository root:
@@ -189,8 +198,9 @@ tests/                    pytest tests
 
 ## Limitations and responsible use
 
-- The runnable workflow uses synthetic aggregate traces only.
-- The model detects latent regimes in synthetic validation; it does not prove recession predictability.
+- The validated runnable workflow uses synthetic aggregate traces only.
+- Real Google Trends ingestion is experimental and not part of the validated demo path.
+- The model detects latent regimes in synthetic validation; it does not prove real-world predictive performance.
 - Observational aggregate digital traces do not identify causal effects by themselves.
 - Endogeneity, omitted variables, policy feedback, ecological fallacy, sample-selection bias, measurement drift, and time-varying confounding are serious threats for real data.
 - Signal retirement diagnostics flag features for human review only and never automatically delete features.
@@ -205,7 +215,7 @@ Please keep language cautious, preserve the synthetic-data default, add tests fo
 
 ## Experimental production hardening and browser UI
 
-The repository includes a Chrome-friendly browser dashboard plus an operational hardening layer for **experimental** deployments. These controls improve repeatability and observability, but they do not validate predictive power.
+The repository includes a Chrome-friendly browser dashboard plus an operational hardening layer for **experimental** deployments. The validated browser-dashboard data path remains synthetic/demo-only. These controls improve repeatability and observability, but they do not validate real-world monitoring or predictive power.
 
 ### Browser dashboard
 
@@ -226,7 +236,7 @@ python scripts/build_frontend_data.py --config configs/production.experimental.y
 python -m http.server 8080 --directory frontend
 ```
 
-The UI supports country, region/province/state, city/metro, time-range, and keyword-family filters; BSI and HMM posterior charts; alert timeline; top contributing signals; geo comparison table/map placeholder; report viewer; data-quality warnings; drift warnings; and report export. It is intentionally labeled as experimental and avoids claims of recession prediction.
+The UI supports country, region/province/state, city/metro, time-range, and keyword-family filters; BSI-like synthetic demo and HMM posterior charts; alert timeline; top contributing signals; geo comparison table/map placeholder; report viewer; data-quality warnings; drift warnings; and report export. It is intentionally labeled as experimental, is currently synthetic/demo-oriented, and avoids claims of recession prediction.
 
 ### Operations docs
 

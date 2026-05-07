@@ -4,13 +4,15 @@ Audit date: 2026-05-07
 Branch audited: current working branch `work` against the local checkout of `Spbd1/Early-Behavioral-Stress-Detection`  
 Scope: strict repository-state audit only. No source code was modified for this audit.
 
+Update 2026-05-07: Documentation and BSI consistency fixes have been applied for the synthetic-demo/BSI scope only. The README now states that the validated runnable demo remains synthetic and that real Google Trends ingestion is experimental. The BSI implementation is explicitly labeled as an MVP BSI and now serializes safety fields including reliability, warnings, limitations, and the not-recession-prediction warning. Alert persistence, Google Trends ingestion behavior, and frontend behavior remain unchanged.
+
 ## Executive summary
 
 This repository remains an **experimental research prototype**, not a production system. The most mature path is the synthetic-data workflow around the adaptive HMM, synthetic validation artifacts, static/browser dashboard payload generation, and basic operational metadata. Several recently added capabilities are present as useful MVP modules, but they are not integrated into a tested end-to-end live pipeline.
 
 The largest correctness problem found during audit is that the current test suite fails in Google Trends ingestion tests. The failures indicate both a YAML parsing/config-loading problem and a validation-threshold expectation mismatch. Because CI runs `pytest`, the current main branch should be treated as **not green** until fixed.
 
-The second major issue is that `BSI_DESIGN.md` is explicitly design-only and describes a richer, local-baseline, robust-anomaly, cross-signal-agreement, confidence, calibration, and uncertainty framework than the implemented `BehavioralStressIndex`. The implementation is an MVP scalar combiner over precomputed inputs; it does not implement most of the design document's upstream feature construction or calibrated uncertainty.
+The second major issue is that `BSI_DESIGN.md` is explicitly design-only and describes a richer, local-baseline, robust-anomaly, cross-signal-agreement, confidence, calibration, and uncertainty framework than the implemented `BehavioralStressIndex`. The implementation is now labeled as an MVP scalar combiner over precomputed inputs; it documents deferred design components and serializes score, severity band, uncertainty band, reliability proxy, top contributors, limitations, experimental warnings, and a not-recession-prediction warning. It still does not implement most of the design document's upstream feature construction or calibrated uncertainty.
 
 The third major issue is that the Chrome-friendly dashboard/API path is primarily a synthetic-artifact viewer. It derives an approximate BSI-like line directly from the final posterior state, creates hard-coded synthetic geographies, and does not consume the new alert engine or report generator. This is acceptable as a demo, but it is inconsistent with the richer alert/report modules and must not be presented as a validated BSI dashboard.
 
@@ -18,16 +20,16 @@ The third major issue is that the Chrome-friendly dashboard/API path is primaril
 
 | Component | Classification | Strict assessment |
 |---|---|---|
-| README scientific framing | MVP IMPLEMENTED | Cautious disclaimers are strong and accurate for research use, but README overstates some ingestion/config reliability while tests fail. |
+| README scientific framing | MVP IMPLEMENTED | Cautious disclaimers are strong and accurate for research use. README now separates the validated synthetic demo from experimental real Google Trends ingestion and avoids production/prediction claims. |
 | Synthetic data workflow | MVP IMPLEMENTED | Runs through synthetic generation, preprocessing, HMM, metrics, output artifacts, and lineage metadata. Validation remains synthetic-only. |
 | Adaptive HMM implementation | MVP IMPLEMENTED | Covered by tests and used by synthetic workflow. No prospective real-data validation. |
 | Ontology-guided keyword generation | MVP IMPLEMENTED | Deterministic ontology, local RAG retrieval, candidates, validation, review states, and registry persistence exist. No LLM integration or live keyword performance validation. |
 | Local RAG grounding | MVP IMPLEMENTED | Local JSONL lexical retriever exists and is appropriately scoped to explanation/grounding only. It is not semantic RAG and has no citation-quality validation. |
 | Geo-aware keyword support | PARTIAL | Keyword geo metadata and registry support stable codes, support flags, low-volume flags, and locale. Provider-code validation and provider support checks are manual. |
-| Google Trends ingestion | BROKEN | Pipeline exists, but config parsing tests fail, sample YAML uses block lists unsupported by the local YAML shim, and live pytrends behavior is unvalidated. |
+| Google Trends ingestion | BROKEN/EXPERIMENTAL | Pipeline exists, but config parsing tests fail, sample YAML uses block lists unsupported by the local YAML shim, and live pytrends behavior is unvalidated. Documentation now labels real ingestion as experimental and outside the validated synthetic demo path. |
 | Optional pytrends dependency handling | PARTIAL | `pytrends` is optional extra, but missing dependency raises at pipeline/client construction without a tailored diagnostic or preflight check. |
 | BSI design document | COMPLETE as design-only | The document is clear that it is design-only and provides rich requirements. It should not be read as implemented. |
-| BSI implementation | PARTIAL | A bounded weighted composite exists, but it omits most design-spec feature generation, calibration, confidence formula, reliability labels, required output fields, and robust uncertainty. |
+| BSI implementation | MVP IMPLEMENTED / PARTIAL DESIGN COVERAGE | A bounded weighted composite exists and is explicitly labeled MVP BSI. The serialized output includes score, severity band, uncertainty band, reliability proxy, top contributors, limitations, experimental warnings, not-recession-prediction warning, implementation label, and components. It still omits most design-spec feature generation, calibration, volume-aware reliability, and robust uncertainty. |
 | Geo normalization/local baselines | PARTIAL | Simple per-geo mean/std z-score store exists. It is not rolling, robust, seasonal, leakage-safe, persistent, or integrated into BSI computation. |
 | Geo-aware alert engine | MVP IMPLEMENTED | Conservative in-memory engine with suppressions, cooldown, warnings, confidence, and history exists. Not persistent, not integrated with dashboard payload, and not calibrated on real data. |
 | Alert false-positive suppression | PARTIAL | Heuristic suppressions exist for low breadth, anomaly, persistence, drift, data quality, geo reliability, unsupported geos, and cooldown. No news/holiday/viral-topic/seasonality suppression. |
@@ -274,8 +276,8 @@ Needs correction or clarification:
 - Optional extras list omits `pip install -e .[ingestion]` in the initial optional extras block even though the ingestion section later mentions it.
 - The README says ingestion config loads typed YAML settings, but current YAML parsing is broken for inline and block lists in tests/sample config.
 - The README's dashboard description mixes the older Streamlit synthetic dashboard with newer Chrome-friendly dashboard concepts; the Chrome dashboard is synthetic/demo-only and should be labeled as such wherever mentioned.
-- The README should explicitly say `BSI_DESIGN.md` is design-only and the implemented BSI is an MVP utility that does not implement the full design.
-- Any wording that implies reusable Google Trends ingestion is ready for live collection should be softened until config parsing, optional dependency handling, and live-provider validation are fixed.
+- Addressed for current docs: the README says `BSI_DESIGN.md` is design-only and the implemented BSI is an MVP utility that does not implement the full design.
+- Addressed for README-level claims: wording that implied Google Trends ingestion is ready for live collection has been softened; config parsing, optional dependency handling, and live-provider validation still need fixes.
 
 ## Data lineage and metadata review
 

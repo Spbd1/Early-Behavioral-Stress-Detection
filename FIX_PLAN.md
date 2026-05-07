@@ -1,6 +1,8 @@
 # Prioritized Fix Plan
 
-Source audit: `CURRENT_STATE_AUDIT.md` dated 2026-05-07. This plan is intentionally limited to planning and validation design; it does not change architecture or implement fixes.
+Source audit: `CURRENT_STATE_AUDIT.md` dated 2026-05-07. This plan is intentionally limited to planning and validation design except where status notes record completed narrow fixes.
+
+Update 2026-05-07: The documentation and BSI consistency slice of A2/C1/C2/E2 has been implemented. README now labels the validated runnable demo as synthetic and real Google Trends ingestion as experimental. BSI is labeled MVP, documents implemented/deferred design components, and serializes reliability, warnings, limitations, top contributors, an experimental warning, and a not-recession-prediction warning. Alert persistence, Google Trends ingestion behavior, and frontend behavior were intentionally not changed.
 
 ## Prioritization principles
 
@@ -33,13 +35,15 @@ Source audit: `CURRENT_STATE_AUDIT.md` dated 2026-05-07. This plan is intentiona
 
 ### A2. P0 — Clarify BSI implementation contract versus design document
 
+**Status update 2026-05-07:** Documentation and MVP output-schema clarification completed for the current implementation. Remaining work is design-conformance expansion only; scoring formula calibration and upstream feature construction are intentionally deferred.
+
 - **Problem:** `BSI_DESIGN.md` describes a richer design than the implemented `BehavioralStressIndex`, including local baselines, calibrated uncertainty, confidence, reliability, and output fields that are not implemented.
 - **Why it matters:** Users can misinterpret the current BSI as design-complete, creating scientific and operational risk.
 - **Files likely affected:** `BSI_DESIGN.md`, `README.md`, `src/behavioral_stress/alerting/bsi.py`, `tests/test_geo_alerting.py`, possible new BSI contract tests.
 - **Risk level:** High. It changes public interpretation of core output without necessarily changing algorithms.
 - **Implementation approach:** First document the implemented MVP contract explicitly. Then either rename/label missing design fields as future work or add a separate design-conformance backlog. Avoid changing the scoring formula until tests pin the current intended MVP behavior.
 - **Validation method:** Add tests that assert the MVP output schema and docs claim consistency; review README and design docs for explicit design-only language.
-- **Expected result:** Documentation and tests make clear which BSI fields and guarantees exist today.
+- **Expected result:** Documentation and tests make clear which BSI fields and guarantees exist today. Current MVP fields are score, severity band, uncertainty band, reliability proxy, top contributors, limitations, warnings, implementation label, and components.
 - **Requires network access:** No.
 - **Requires external credentials:** No.
 
@@ -121,6 +125,8 @@ Source audit: `CURRENT_STATE_AUDIT.md` dated 2026-05-07. This plan is intentiona
 
 ### C2. P1 — Add explicit status labels for design-only, MVP, partial, and missing components
 
+**Status update 2026-05-07:** BSI-related labels were added: `BSI_DESIGN.md` is design-only and `BehavioralStressIndex` is an implemented MVP BSI. Broader repository labeling remains future cleanup.
+
 - **Problem:** The repository contains mature-looking docs for components that are implemented only partially or as design-only artifacts.
 - **Why it matters:** Clear status labels reduce misuse and make roadmap sequencing more transparent.
 - **Files likely affected:** `README.md`, `BSI_DESIGN.md`, `ARCHITECTURE_GAPS.md`, `ROADMAP.md`, `MILESTONE_TRACKER.md`, `docs/production_hardening.md`.
@@ -196,6 +202,8 @@ Source audit: `CURRENT_STATE_AUDIT.md` dated 2026-05-07. This plan is intentiona
 - **Requires external credentials:** No.
 
 ### E2. P1 — Add BSI design/MVP contract tests
+
+**Status update 2026-05-07:** Minimal BSI contract coverage added for MVP output fields and documentation status labels.
 
 - **Problem:** There are no tests ensuring docs and implemented BSI schema remain aligned.
 - **Why it matters:** BSI is central to downstream interpretation.

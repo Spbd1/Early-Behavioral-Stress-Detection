@@ -37,13 +37,13 @@ This tracker is initialized from `IMPLEMENTATION_PLAN.md`, `FINALIZATION_CHECKLI
 
 | Validation area | Current state | Next milestone to advance | Notes |
 |---|---|---|---|
-| Repository claim/safety scan | Pending | P0 | Confirm docs and demos do not imply validated production, diagnostic, causal, or recession-prediction capability. |
+| Repository claim/safety scan | Partial | P0 | README/BSI wording now states the validated runnable demo remains synthetic, real Google Trends ingestion is experimental, BSI is MVP, and outputs are not recession predictions. Broader claim scan remains pending. |
 | Source terms and registry review | In progress | P1 | Local source metadata exists, but legal/terms and production registry review remain required before scheduled live connector operation. |
 | Fixture-only connector tests | Added | P2 | `tests/test_google_trends_ingestion.py` covers retries, batching, cache replay, validation, normalization, and artifact separation without live Google calls. |
 | Immutable raw-to-feature replay | Partial | P3 | Raw, processed, cache, and metadata artifacts are separated for Google Trends, but immutable snapshot manifests are still pending. |
 | Model artifact reproducibility | Pending | P4 | Must include git commit, dependency lock, config hash, feature snapshot, and seed. |
 | Decision-time backtesting | Pending | P5 | Must prove no future information is used. |
-| Calibration and threshold approval | Pending | P5 | Required before any alert milestone can proceed. |
+| Calibration and threshold approval | Pending | P5 | Required before any alert milestone can proceed. Current MVP BSI reliability and uncertainty fields are heuristic labels, not calibrated approval evidence. |
 | Shadow-mode operational health | Pending | P6 | Must run internally with no external delivery. |
 | Human-reviewed alert auditability | Partial for keyword governance and alert decision records | R1/P7 | Keyword candidates have human review states and version history; alert decisions now include criteria, suppressions, warnings, explanations, cooldown state, and recent history, but human approval gates and postmortems remain pending. |
 | Deployment and rollback evidence | Pending | P8 | Required for controlled production operation. |
@@ -57,6 +57,15 @@ When a milestone implementation begins or completes:
 3. Record any new risks in `docs/risk_register.md` once that file exists.
 4. Update `FINALIZATION_CHECKLIST.md` gate statuses only when code, configuration, tests, documentation, and operational evidence exist.
 5. Keep deferred optional work deferred unless it has no negative impact on must-have production requirements.
+
+## Documentation and BSI consistency update
+
+Completed narrow consistency fixes on 2026-05-07:
+
+- README distinguishes the validated synthetic demo from experimental real Google Trends ingestion.
+- `BehavioralStressIndex` is labeled as an implemented MVP BSI rather than the full `BSI_DESIGN.md` design.
+- MVP BSI output now includes reliability, limitations, warnings, an experimental warning, a not-recession-prediction warning, top contributors, score, severity band, uncertainty band, implementation label, and component values.
+- Alert persistence, Google Trends ingestion implementation, and frontend implementation were not changed.
 
 ## Experimental production/frontend hardening update
 

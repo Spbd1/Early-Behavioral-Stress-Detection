@@ -1,6 +1,6 @@
 # Behavioral Stress Index (BSI) Design
 
-**Status:** Design-only specification. Do not interpret this document as an implemented model.
+**Status:** Design-only specification. Do not interpret this document as an implemented model. The current code implementation is an **MVP BSI** in `src/behavioral_stress/alerting/bsi.py`; it implements a bounded heuristic score, conservative bands, an uncertainty band, a reliability proxy, top contributors, limitations, and safety warnings, while deferring local baselines, seasonality/event adjustment, calibrated uncertainty, volume-aware reliability, and full lineage/version metadata.
 
 **Safety framing:** The Behavioral Stress Index (BSI) is **not a recession predictor** and must not be presented as a deterministic economic forecast. It is an **experimental behavioral stress monitoring indicator** intended to summarize abnormal, stress-related changes in aggregate digital traces relative to each geography's own historical baseline.
 
