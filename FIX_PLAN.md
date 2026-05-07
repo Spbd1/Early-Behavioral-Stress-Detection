@@ -418,3 +418,13 @@ Update 2026-05-07: The documentation and BSI consistency slice of A2/C1/C2/E2 ha
 - Do not replace the current architecture with a new orchestration framework.
 - Do not add production infrastructure such as managed databases, queues, auth gateways, or secret managers before interfaces and tests justify them.
 - Do not expand the UI with new features until current controls, schema, and warnings are correct.
+
+## Google Trends ingestion reliability/offline-testability fixes
+
+Status on 2026-05-07: implemented for offline reliability and testability only.
+
+- Keep pytrends optional by delaying imports to `PytrendsClient` construction and surfacing a clear runtime error for live ingestion when the optional dependency is absent.
+- Provide `google_trends.dry_run: true` and CLI `--dry-run` paths backed by a deterministic mock `TrendsClient`; this mode must not require network access, credentials, or pytrends.
+- Validate every raw CSV, processed panel CSV, and metadata JSON emitted by the ingestion run before returning artifact paths.
+- Preserve geography metadata and warnings in run metadata, including unsupported/city/low-volume caveats.
+- Avoid overclaiming pytrends reliability; all live-provider behavior remains experimental and must be separately validated.

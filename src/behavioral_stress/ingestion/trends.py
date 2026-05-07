@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import uuid
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import pandas as pd
 
@@ -33,10 +34,21 @@ class TrendsClient(Protocol):
 
 
 class PytrendsClient:
-    """pytrends-backed Google Trends client."""
+    """pytrends-backed Google Trends client.
+
+    pytrends is intentionally imported only when this live connector is constructed so package
+    imports, offline tests, and dry runs do not require the optional dependency.
+    """
 
     def __init__(self, language: str = "en-US", timezone: int = 0):
-        from pytrends.request import TrendReq
+        try:
+            from pytrends.request import TrendReq
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "Live Google Trends ingestion requires the optional pytrends dependency. "
+                "Install it with `pip install -e .[ingestion]`, or run with `--dry-run`/"
+                "`google_trends.dry_run: true` for offline artifact generation."
+            ) from exc
 
         self._trend_req = TrendReq(hl=language, tz=timezone)
 
@@ -53,6 +65,37 @@ class PytrendsClient:
         )
         frame = self._trend_req.interest_over_time()
         return frame.drop(columns=["isPartial"], errors="ignore")
+
+
+class MockTrendsClient:
+    """Deterministic offline Google Trends fixture client for dry runs and tests.
+
+    The generated values are intentionally plausible provider-shaped 0-100 indexes, not claims of
+    real query volume. Region and keyword differences are deterministic so artifact validation can
+    exercise multi-keyword, multi-geo panels without network access.
+    """
+
+    def interest_over_time(
+        self,
+        keywords: list[str],
+        timeframe: str,
+        geo: str,
+        category: int,
+        gprop: str,
+    ) -> pd.DataFrame:
+        dates = _dates_for_timeframe(timeframe)
+        geo_seed = sum(ord(char) for char in (geo or "global")) % 17
+        data: dict[str, list[int]] = {}
+        for keyword_index, keyword in enumerate(keywords):
+            keyword_seed = sum(ord(char) for char in keyword) % 23
+            baseline = 35 + ((geo_seed + keyword_seed + keyword_index * 3) % 25)
+            values = []
+            for day_index, _ in enumerate(dates):
+                seasonal = ((day_index * (keyword_index + 2) + geo_seed) % 21) - 10
+                value = max(0, min(100, baseline + seasonal))
+                values.append(int(value))
+            data[keyword] = values
+        return pd.DataFrame(data, index=dates)
 
 
 class RateLimiter:
@@ -80,7 +123,11 @@ class GoogleTrendsIngestionPipeline:
 
     def __init__(self, config: GoogleTrendsIngestionConfig, client: TrendsClient | None = None):
         self.config = config
-        self.client = client or PytrendsClient(config.language, config.timezone)
+        self.client = client or (
+            MockTrendsClient()
+            if config.dry_run
+            else PytrendsClient(config.language, config.timezone)
+        )
         self.cache = FileCache(
             config.cache.directory, config.cache.ttl_seconds, config.cache.enabled
         )
@@ -100,22 +147,43 @@ class GoogleTrendsIngestionPipeline:
         metadata: dict[str, object] = {
             "run_id": run_id,
             "started_at": datetime.now(UTC).isoformat(),
+            "dry_run": self.config.dry_run,
+            "provider": "mock" if self.config.dry_run else "pytrends",
             "config": _jsonable_config(self.config),
             "regions": [],
+            "warnings": [
+                "Google Trends values are scaled within a requested keyword set, geography, and "
+                "timeframe and should not be naively compared across regions."
+            ],
         }
 
-        for region in self.config.regions:
-            region_metadata = {"region": region, "timeframes": []}
+        for region_entry in self.config.regions:
+            geo = _geo_from_region_entry(region_entry)
+            geo_metadata = build_geo_metadata(region_entry)
+            for warning in geo_metadata["warnings"]:
+                LOGGER.warning(
+                    "google trends geography warning",
+                    extra={"ingestion_region": geo, "ingestion_warning": warning},
+                )
+            region_metadata: dict[str, Any] = {
+                "region": geo,
+                "geo_metadata": geo_metadata,
+                "timeframes": [],
+            }
             frames = []
-            for timeframe in self._timeframes_for_region(region):
-                result = self._ingest_region_timeframe(run_id, region, timeframe)
+            for timeframe in self._timeframes_for_region(geo):
+                result = self._ingest_region_timeframe(run_id, geo, timeframe)
                 frames.append(result["processed"])
                 region_metadata["timeframes"].append(result["metadata"])
             processed = _merge_processed_frames(frames)
-            processed_path = self._processed_path(run_id, region)
+            processed_path = self._processed_path(run_id, geo)
             processed.to_csv(processed_path, index=False)
-            outputs[f"processed_{region or 'global'}"] = str(processed_path)
+            processed_validation = validate_processed_artifact(processed_path)
+            if processed_validation["status"] == "fail":
+                raise ValueError(f"processed artifact validation failed: {processed_validation}")
+            outputs[f"processed_{geo or 'global'}"] = str(processed_path)
             region_metadata["processed_path"] = str(processed_path)
+            region_metadata["processed_validation"] = processed_validation
             metadata["regions"].append(region_metadata)
 
         metadata["finished_at"] = datetime.now(UTC).isoformat()
@@ -123,11 +191,16 @@ class GoogleTrendsIngestionPipeline:
         metadata_path.write_text(
             json.dumps(metadata, indent=2, sort_keys=True, default=str), "utf-8"
         )
+        metadata_validation = validate_metadata_artifact(metadata_path)
+        if metadata_validation["status"] == "fail":
+            raise ValueError(f"metadata artifact validation failed: {metadata_validation}")
         outputs["metadata"] = str(metadata_path)
         LOGGER.info("finished trends ingestion", extra={"ingestion_run_id": run_id})
         return outputs
 
     def _timeframes_for_region(self, region: str) -> list[str]:
+        if self.config.dry_run:
+            return self.config.all_timeframes()
         if not self.config.incremental:
             return self.config.all_timeframes()
         latest = _latest_processed_date(self.config.storage.processed_directory, region)
@@ -149,6 +222,9 @@ class GoogleTrendsIngestionPipeline:
             )
             raw_path = self._raw_path(run_id, region, timeframe, index)
             raw.to_csv(raw_path)
+            raw_artifact_validation = validate_raw_artifact(raw_path, batch)
+            if raw_artifact_validation["status"] == "fail":
+                raise ValueError(f"raw artifact validation failed: {raw_artifact_validation}")
             processed = normalize_batch(raw, batch, self.config.anchor_keyword)
             processed["region"] = region
             processed["timeframe"] = timeframe
@@ -159,6 +235,7 @@ class GoogleTrendsIngestionPipeline:
                     "keywords": batch,
                     "raw_path": str(raw_path),
                     "validation": validation,
+                    "raw_artifact_validation": raw_artifact_validation,
                 }
             )
             LOGGER.info(
@@ -199,6 +276,7 @@ class GoogleTrendsIngestionPipeline:
             "region": region,
             "category": self.config.category,
             "gprop": self.config.gprop,
+            "dry_run": self.config.dry_run,
         }
         key = self.cache.key_for(request)
         cached = self.cache.get(key)
@@ -210,7 +288,8 @@ class GoogleTrendsIngestionPipeline:
         delay = self.config.retry.backoff_seconds
         for attempt in range(1, self.config.retry.max_attempts + 1):
             try:
-                self.rate_limiter.wait()
+                if not self.config.dry_run:
+                    self.rate_limiter.wait()
                 frame = self.client.interest_over_time(
                     keywords=keywords,
                     timeframe=timeframe,
@@ -233,15 +312,15 @@ class GoogleTrendsIngestionPipeline:
         raise RuntimeError(f"Google Trends request failed after retries: {request}") from last_error
 
     def _raw_path(self, run_id: str, region: str, timeframe: str, batch_index: int) -> Path:
-        safe_region = region or "global"
-        safe_timeframe = timeframe.replace(" ", "_").replace("/", "-")
+        safe_region = _safe_label(region or "global")
+        safe_timeframe = _safe_label(timeframe.replace(" ", "_"))
         return (
             self.config.storage.raw_directory
             / f"{run_id}_{safe_region}_{safe_timeframe}_b{batch_index}.csv"
         )
 
     def _processed_path(self, run_id: str, region: str) -> Path:
-        safe_region = region or "global"
+        safe_region = _safe_label(region or "global")
         return self.config.storage.processed_directory / f"{run_id}_{safe_region}_processed.csv"
 
 
@@ -318,6 +397,196 @@ def validate_trends_frame(
     return {"status": "fail" if issues else "pass", "issues": issues}
 
 
+def validate_raw_artifact(path: str | Path, expected_keywords: list[str]) -> dict[str, object]:
+    """Validate a raw provider response CSV artifact for date index and keyword columns."""
+    issues: list[str] = []
+    path = Path(path)
+    if not path.exists():
+        return {"status": "fail", "issues": ["missing_file"]}
+    try:
+        frame = pd.read_csv(path, index_col=0)
+    except Exception as exc:  # noqa: BLE001 - artifact boundary should report any parse failure
+        return {"status": "fail", "issues": [f"unreadable_csv:{exc.__class__.__name__}"]}
+    if frame.empty:
+        issues.append("empty_file")
+    try:
+        dates = pd.to_datetime(frame.index, errors="raise")
+    except Exception:  # noqa: BLE001
+        issues.append("invalid_date_index")
+        dates = pd.Index([])
+    if len(dates) and pd.Index(dates).duplicated().any():
+        issues.append("duplicate_dates")
+    for keyword in expected_keywords:
+        if keyword not in frame.columns:
+            issues.append(f"missing_column:{keyword}")
+            continue
+        numeric = pd.to_numeric(frame[keyword], errors="coerce")
+        if numeric.notna().sum() == 0:
+            issues.append(f"non_numeric_column:{keyword}")
+        outside_scale = numeric.dropna()[(numeric.dropna() < 0) | (numeric.dropna() > 100)]
+        if not outside_scale.empty:
+            issues.append(f"outside_0_100_scale:{keyword}")
+    return {"status": "fail" if issues else "pass", "issues": issues, "path": str(path)}
+
+
+def validate_processed_artifact(path: str | Path) -> dict[str, object]:
+    """Validate a processed long-format Google Trends panel artifact."""
+    required = [
+        "date",
+        "keyword",
+        "value_raw",
+        "value_normalized",
+        "anchor_value",
+        "region",
+        "timeframe",
+    ]
+    issues: list[str] = []
+    path = Path(path)
+    if not path.exists():
+        return {"status": "fail", "issues": ["missing_file"]}
+    try:
+        frame = pd.read_csv(path)
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "fail", "issues": [f"unreadable_csv:{exc.__class__.__name__}"]}
+    if frame.empty:
+        issues.append("empty_file")
+    for column in required:
+        if column not in frame.columns:
+            issues.append(f"missing_column:{column}")
+    if issues:
+        return {"status": "fail", "issues": issues, "path": str(path)}
+    if pd.to_datetime(frame["date"], errors="coerce").isna().any():
+        issues.append("invalid_dates")
+    for column in ["value_raw", "value_normalized", "anchor_value"]:
+        if pd.to_numeric(frame[column], errors="coerce").isna().all():
+            issues.append(f"non_numeric_column:{column}")
+    if frame[["region", "keyword", "date"]].duplicated().any():
+        issues.append("duplicate_region_keyword_date")
+    if frame["keyword"].isna().any() or (frame["keyword"].astype(str).str.len() == 0).any():
+        issues.append("blank_keyword")
+    return {"status": "fail" if issues else "pass", "issues": issues, "path": str(path)}
+
+
+def validate_metadata_artifact(path: str | Path) -> dict[str, object]:
+    """Validate run metadata for required run, region, geo, and artifact references."""
+    issues: list[str] = []
+    path = Path(path)
+    if not path.exists():
+        return {"status": "fail", "issues": ["missing_file"]}
+    try:
+        metadata = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "fail", "issues": [f"unreadable_json:{exc.__class__.__name__}"]}
+    for field in [
+        "run_id",
+        "started_at",
+        "finished_at",
+        "config",
+        "regions",
+        "provider",
+        "dry_run",
+    ]:
+        if field not in metadata:
+            issues.append(f"missing_field:{field}")
+    if "regions" in metadata and not isinstance(metadata["regions"], list):
+        issues.append("regions_not_list")
+    for region_index, region in enumerate(metadata.get("regions", []) or []):
+        for field in [
+            "region",
+            "geo_metadata",
+            "timeframes",
+            "processed_path",
+            "processed_validation",
+        ]:
+            if field not in region:
+                issues.append(f"region_{region_index}_missing_field:{field}")
+        processed_path = region.get("processed_path")
+        if processed_path and not Path(processed_path).exists():
+            issues.append(f"region_{region_index}_missing_processed_path")
+        geo_metadata = region.get("geo_metadata", {})
+        for field in ["provider_geo", "geography_level", "country", "region", "city", "warnings"]:
+            if field not in geo_metadata:
+                issues.append(f"region_{region_index}_geo_missing_field:{field}")
+        for timeframe_index, timeframe in enumerate(region.get("timeframes", []) or []):
+            if "timeframe" not in timeframe or "batches" not in timeframe:
+                issues.append(f"region_{region_index}_timeframe_{timeframe_index}_invalid")
+            for batch_index, batch in enumerate(timeframe.get("batches", []) or []):
+                for field in [
+                    "batch_index",
+                    "keywords",
+                    "raw_path",
+                    "validation",
+                    "raw_artifact_validation",
+                ]:
+                    if field not in batch:
+                        issues.append(
+                            "region_"
+                            f"{region_index}_timeframe_{timeframe_index}_batch_"
+                            f"{batch_index}_missing_field:{field}"
+                        )
+                raw_path = batch.get("raw_path")
+                if raw_path and not Path(raw_path).exists():
+                    issues.append(
+                        "region_"
+                        f"{region_index}_timeframe_{timeframe_index}_batch_"
+                        f"{batch_index}_missing_raw_path"
+                    )
+    return {"status": "fail" if issues else "pass", "issues": issues, "path": str(path)}
+
+
+def build_geo_metadata(region_entry: str | dict[str, Any]) -> dict[str, object]:
+    """Build preserved geography metadata and conservative Google Trends warnings."""
+    if isinstance(region_entry, dict):
+        provider_geo = str(region_entry.get("geo", region_entry.get("provider_geo", "")) or "")
+        country = region_entry.get("country")
+        region = region_entry.get("region")
+        city = region_entry.get("city")
+    else:
+        provider_geo = str(region_entry or "")
+        country = None
+        region = None
+        city = None
+
+    level = "global"
+    warnings: list[str] = []
+    if provider_geo:
+        parts = provider_geo.split("-")
+        if len(parts) == 1 and re.fullmatch(r"[A-Z]{2}", provider_geo):
+            level = "country"
+            country = country or provider_geo
+        elif len(parts) == 2 and all(parts):
+            level = "region"
+            country = country or parts[0]
+            region = region or parts[1]
+        else:
+            level = "unsupported_or_low_volume"
+            warnings.append(
+                "unsupported_or_low_volume_geography: verify the Google Trends geo code before "
+                "using this artifact for analysis"
+            )
+    if city:
+        level = "city"
+        warnings.append(
+            "city_level_google_trends_inputs_are_often_unsupported_or_low_volume; preserve "
+            "metadata but validate provider support before analysis"
+        )
+    if level in {"region", "city"}:
+        warnings.append("low_volume_geographies_may_be_zero_filled_or_suppressed")
+    return {
+        "input": region_entry,
+        "provider_geo": provider_geo,
+        "geography_level": level,
+        "country": country,
+        "region": region,
+        "city": city,
+        "warnings": warnings,
+        "comparability_note": (
+            "Raw Google Trends values are scaled within each request and should not be naively "
+            "compared across regions."
+        ),
+    }
+
+
 def _merge_processed_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
     if not frames:
         return pd.DataFrame()
@@ -332,7 +601,7 @@ def _merge_processed_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
 
 
 def _latest_processed_date(processed_directory: Path, region: str) -> datetime | None:
-    safe_region = region or "global"
+    safe_region = _safe_label(region or "global")
     latest: pd.Timestamp | None = None
     for path in processed_directory.glob(f"*_{safe_region}_processed.csv"):
         frame = pd.read_csv(path, usecols=["date"])
@@ -349,3 +618,23 @@ def _jsonable_config(config: GoogleTrendsIngestionConfig) -> dict[str, object]:
         for key, value in payload[section].items():
             payload[section][key] = str(value)
     return payload
+
+
+def _geo_from_region_entry(region_entry: str | dict[str, Any]) -> str:
+    if isinstance(region_entry, dict):
+        return str(region_entry.get("geo", region_entry.get("provider_geo", "")) or "")
+    return str(region_entry or "")
+
+
+def _safe_label(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-") or "global"
+
+
+def _dates_for_timeframe(timeframe: str) -> pd.DatetimeIndex:
+    match = re.fullmatch(r"(\d{4}-\d{2}-\d{2})\s+(\d{4}-\d{2}-\d{2})", timeframe)
+    if match:
+        start = pd.Timestamp(match.group(1))
+        end = pd.Timestamp(match.group(2))
+        periods = min(max((end - start).days + 1, 1), 30)
+        return pd.date_range(start, periods=periods, freq="D")
+    return pd.date_range(end=pd.Timestamp("2024-01-31"), periods=30, freq="D")

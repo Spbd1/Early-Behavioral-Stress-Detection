@@ -5,17 +5,24 @@ from pathlib import Path
 
 import pandas as pd
 
+from behavioral_stress.ingestion.cli import build_parser
 from behavioral_stress.ingestion.config import (
     CacheConfig,
     GoogleTrendsIngestionConfig,
     RateLimitConfig,
     RetryConfig,
     StorageConfig,
+    ValidationConfig,
     load_ingestion_config,
 )
 from behavioral_stress.ingestion.trends import (
     GoogleTrendsIngestionPipeline,
+    MockTrendsClient,
+    PytrendsClient,
     normalize_batch,
+    validate_metadata_artifact,
+    validate_processed_artifact,
+    validate_raw_artifact,
     validate_trends_frame,
 )
 
@@ -50,6 +57,7 @@ def _config(tmp_path: Path) -> GoogleTrendsIngestionConfig:
         cache=CacheConfig(directory=tmp_path / "cache", ttl_seconds=3600, enabled=True),
         retry=RetryConfig(max_attempts=2, backoff_seconds=0, backoff_multiplier=1),
         rate_limit=RateLimitConfig(requests_per_minute=1_000_000),
+        validation=ValidationConfig(min_nonzero_fraction=0.5),
     )
 
 
@@ -107,7 +115,9 @@ def test_load_ingestion_config_supports_nested_sections(tmp_path):
     path.write_text(
         """
 google_trends:
-  keywords: [anchor, kw]
+  keywords:
+    - anchor
+    - kw
   anchor_keyword: anchor
   storage:
     raw_directory: raw_dir
@@ -125,3 +135,94 @@ google_trends:
     assert config.storage.raw_directory == Path("raw_dir")
     assert config.cache.enabled is False
     assert config.retry.max_attempts == 5
+
+
+
+def test_import_and_mock_client_do_not_require_pytrends(tmp_path):
+    config = _config(tmp_path).__class__(**{**_config(tmp_path).__dict__, "dry_run": True})
+    pipeline = GoogleTrendsIngestionPipeline(config)
+
+    assert isinstance(pipeline.client, MockTrendsClient)
+
+
+def test_live_client_reports_clear_pytrends_error_when_missing(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name.startswith("pytrends"):
+            raise ModuleNotFoundError("No module named 'pytrends'")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", blocked_import)
+
+    try:
+        PytrendsClient()
+    except RuntimeError as exc:
+        assert "optional pytrends dependency" in str(exc)
+        assert "--dry-run" in str(exc)
+    else:  # pragma: no cover - this should not be reached when import is blocked
+        raise AssertionError("PytrendsClient should fail clearly when pytrends is unavailable")
+
+
+def test_dry_run_writes_valid_artifacts_and_preserves_geo_metadata(tmp_path):
+    base = _config(tmp_path)
+    config = base.__class__(
+        **{
+            **base.__dict__,
+            "dry_run": True,
+            "regions": [
+                "US",
+                {"geo": "US-CA", "country": "US", "region": "CA", "city": "Los Angeles"},
+            ],
+            "cache": CacheConfig(directory=tmp_path / "cache", ttl_seconds=3600, enabled=False),
+        }
+    )
+
+    outputs = GoogleTrendsIngestionPipeline(config).run()
+
+    assert Path(outputs["processed_US"]).exists()
+    assert Path(outputs["processed_US-CA"]).exists()
+    assert validate_processed_artifact(outputs["processed_US"])["status"] == "pass"
+    assert validate_metadata_artifact(outputs["metadata"])["status"] == "pass"
+
+    raw_paths = sorted((tmp_path / "raw").glob("*.csv"))
+    assert raw_paths
+    assert validate_raw_artifact(raw_paths[0], ["anchor", "kw1", "kw2"])["status"] == "pass"
+
+    metadata = json.loads(Path(outputs["metadata"]).read_text(encoding="utf-8"))
+    assert metadata["dry_run"] is True
+    assert metadata["provider"] == "mock"
+    ca_region = next(region for region in metadata["regions"] if region["region"] == "US-CA")
+    assert ca_region["geo_metadata"]["country"] == "US"
+    assert ca_region["geo_metadata"]["region"] == "CA"
+    assert ca_region["geo_metadata"]["city"] == "Los Angeles"
+    assert ca_region["geo_metadata"]["warnings"]
+    assert (
+        "should not be naively compared across regions"
+        in ca_region["geo_metadata"]["comparability_note"]
+    )
+
+
+def test_artifact_validators_flag_schema_errors(tmp_path):
+    bad_raw = tmp_path / "bad_raw.csv"
+    bad_raw.write_text("date,unexpected\n2024-01-01,1\n", encoding="utf-8")
+    assert validate_raw_artifact(bad_raw, ["anchor"])["status"] == "fail"
+
+    bad_processed = tmp_path / "bad_processed.csv"
+    bad_processed.write_text("date,keyword\n2024-01-01,kw\n", encoding="utf-8")
+    assert validate_processed_artifact(bad_processed)["status"] == "fail"
+
+    bad_metadata = tmp_path / "bad_metadata.json"
+    bad_metadata.write_text('{"run_id": "only"}', encoding="utf-8")
+    assert validate_metadata_artifact(bad_metadata)["status"] == "fail"
+
+
+def test_ingestion_cli_help_includes_dry_run():
+    parser = build_parser()
+    subparsers = next(action for action in parser._actions if action.dest == "command")
+    trends_parser = subparsers.choices["google-trends"]
+
+    assert "--dry-run" in trends_parser.format_help()
+    assert "google-trends" in parser.format_help()

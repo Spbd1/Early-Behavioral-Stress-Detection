@@ -6,7 +6,7 @@ Scope: strict repository-state audit only. No source code was modified for this 
 
 Update 2026-05-07: Documentation and BSI consistency fixes have been applied for the synthetic-demo/BSI scope only. The README now states that the validated runnable demo remains synthetic and that real Google Trends ingestion is experimental. The BSI implementation is explicitly labeled as an MVP BSI and now serializes safety fields including reliability, warnings, limitations, and the not-recession-prediction warning. Alert persistence, Google Trends ingestion behavior, and frontend behavior remain unchanged.
 
-Update 2026-05-07 (alert persistence and offline smoke validation): A small JSONL-backed alert history store now exists alongside the default in-memory store. Alert histories can be loaded/replayed from serialized decision records, and the offline smoke test exercises synthetic/mocked observations through MVP BSI computation, geo-aware alert decisions, conservative report generation, and dashboard-ready JSON payload serialization without live Google Trends, API keys, or network access. Report language guardrails now assert the safe phrase “behavioral stress signal increased” and reject the unsafe phrase “recession is coming.” Low-confidence city/metro and unsupported geography cases are covered by tests that warn or suppress instead of emitting misleading high-confidence alerts. Google Trends ingestion and frontend architecture remain unchanged.
+Update 2026-05-07 (alert persistence and offline smoke validation): A small JSONL-backed alert history store now exists alongside the default in-memory store. Alert histories can be loaded/replayed from serialized decision records, and the offline smoke test exercises synthetic/mocked observations through MVP BSI computation, geo-aware alert decisions, conservative report generation, and dashboard-ready JSON payload serialization without live Google Trends, API keys, or network access. Report language guardrails now assert the safe phrase “behavioral stress signal increased” and reject the unsafe phrase “recession is coming.” Low-confidence city/metro and unsupported geography cases are covered by tests that warn or suppress instead of emitting misleading high-confidence alerts. Google Trends ingestion now has offline mock/dry-run reliability fixes; frontend architecture remains unchanged.
 
 ## Executive summary
 
@@ -150,20 +150,20 @@ However, the current implementation is broken enough that it should not be descr
 
 Because CI runs `pytest`, this is a release-blocking inconsistency.
 
-### YAML/config parsing is unreliable
+### YAML/config parsing status
 
 - The repository shadows PyYAML with `src/yaml.py`.
-- The shim parser supports simple nested mappings but not YAML block lists or inline lists.
-- The sample Google Trends config uses block lists for `keywords`, `regions`, and `historical_timeframes`; those will not parse into the expected lists through the shim.
-- README states ingestion config loads typed YAML settings, but current parsing behavior can silently convert lists to strings or empty dict-like structures.
+- The shim parser now supports simple nested mappings plus block and inline scalar lists used by the ingestion sample config.
+- It remains a small compatibility shim rather than a complete YAML implementation.
 
-### Google Trends ingestion reliability gaps
+### Google Trends ingestion reliability status
 
-- Live pytrends use is not validated in tests.
-- `pytrends` missing dependency handling is not user-friendly; constructing the pipeline without the extra will raise an import error from inside `PytrendsClient`.
-- There is retry/backoff, rate limiting, cache, and validation, but no robust handling of Google throttling semantics, partial responses beyond dropping `isPartial`, provider rescaling across runs, or canonical provider errors.
-- Anchor normalization uses the anchor series in each batch, but anchor completeness/stability checks do not stop downstream processing; failing quality gates are recorded, not enforced.
-- Incremental ingestion scans processed files by region and creates an overlapping date request, but there is no explicit point-in-time data lineage or deduplication across changed provider samples beyond keeping last duplicate row.
+- Live pytrends use is not validated in tests and remains experimental.
+- `pytrends` is optional for package imports, tests, and dry-run ingestion; live `PytrendsClient` construction now raises a clear install/dry-run error when pytrends is unavailable.
+- Dry-run ingestion uses a deterministic mock client and validates raw CSV, processed panel CSV, and metadata JSON artifacts before returning paths.
+- There is retry/backoff, rate limiting, cache, validation, and artifact schema checking, but no robust live-provider guarantee for Google throttling semantics, provider rescaling across runs, or canonical provider errors.
+- Anchor quality gates are recorded and artifact schemas are enforced; live analytical use still requires review of quality warnings before downstream analysis.
+- Incremental ingestion scans processed files by region and creates an overlapping date request, but immutable point-in-time snapshot manifests remain pending.
 
 ### BSI design/implementation mismatch
 
@@ -317,3 +317,14 @@ Unsafe for production:
 Strict classification of the whole project: **MVP IMPLEMENTED for synthetic research; PARTIAL/BROKEN for live Google Trends + BSI + geo-alert production pipeline; not production-ready.**
 
 Before any production claim, the project needs a green test suite, fixed YAML/config loading, explicit pytrends preflight handling, live ingestion validation, BSI design/implementation reconciliation, persistent alert history, dashboard/API schema alignment, durable lineage across all outputs, calibrated thresholds, security controls, and full end-to-end tests.
+
+## Google Trends ingestion reliability/offline-testability update
+
+Completed on 2026-05-07:
+
+- pytrends remains an optional dependency: importing the ingestion package and running offline tests no longer requires pytrends, while live `PytrendsClient` construction raises an explicit install/dry-run error if pytrends is missing.
+- Added deterministic Google Trends dry-run/mock ingestion that writes raw provider-shaped CSVs, processed long-format panels, and run metadata without network access or secrets.
+- Added artifact validators for raw provider response CSVs, processed long-format panel CSVs, and run metadata JSON, including required columns/fields, date parsing, numeric checks, duplicate checks, and artifact path checks.
+- Run metadata now preserves geography metadata for country/region/city-style inputs, records unsupported or low-volume geography warnings, and repeats the limitation that raw Google Trends values are scaled within each request and must not be naively compared across regions.
+
+Still deferred: live Google Trends reliability claims, provider terms/legal review, scheduled live operation, and calibrated use of real-world Google Trends signals.
