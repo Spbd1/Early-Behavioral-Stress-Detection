@@ -19,6 +19,9 @@ class StressReport:
 class ReportGenerator:
     """Generate conservative structured JSON and Markdown reports."""
 
+    REQUIRED_SAFE_PHRASE = "behavioral stress signal increased"
+    FORBIDDEN_PHRASES = ("recession is coming",)
+
     def generate(
         self,
         *,
@@ -50,9 +53,22 @@ class ReportGenerator:
                 "they do not claim recession prediction."
             ),
         }
-        return StressReport(
-            structured=structured, markdown=self._markdown(structured, decisions_payload)
-        )
+        markdown = self._markdown(structured, decisions_payload)
+        self._assert_language_safe(markdown, structured)
+        return StressReport(structured=structured, markdown=markdown)
+
+    @classmethod
+    def _assert_language_safe(
+        cls, markdown: str, structured: Mapping[str, object]
+    ) -> None:
+        serialized = f"{markdown} {structured}".lower()
+        if cls.REQUIRED_SAFE_PHRASE not in serialized:
+            raise ValueError(
+                f"Report must include safe phrase: {cls.REQUIRED_SAFE_PHRASE!r}."
+            )
+        for phrase in cls.FORBIDDEN_PHRASES:
+            if phrase in serialized:
+                raise ValueError(f"Report contains forbidden predictive phrase: {phrase!r}.")
 
     @staticmethod
     def _summary(

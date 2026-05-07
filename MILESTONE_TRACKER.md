@@ -84,3 +84,16 @@ Remaining roadmap items:
 - Formal model-risk review, privacy/legal review, and incident response ownership before any non-research deployment.
 - Orchestrator-enforced rollback automation and monitored production telemetry integrations.
 - Stronger statistical drift tests, calibrated alert thresholds, and independent audit of geographic comparability.
+
+
+## Alert persistence and offline smoke validation update
+
+Completed on 2026-05-07:
+
+- Added optional JSONL-backed alert history persistence while keeping the in-memory history store as the unit-test/default implementation.
+- Added replay/load semantics for serialized alert decision history.
+- Added an offline end-to-end smoke test from synthetic/mocked observations through BSI, alert decision, report generation, and dashboard-ready JSON payload.
+- Added report language safety checks for “behavioral stress signal increased” and against “recession is coming.”
+- Added geo-safety tests for low-confidence city/metro and unsupported geography suppressions/warnings.
+
+Still deferred: Google Trends ingestion changes, frontend architecture changes, calibrated alert thresholds, provider-code validation, and live/provider integration validation.

@@ -4,6 +4,7 @@ from behavioral_stress.alerting.bsi import BehavioralStressIndex, BSIInput, BSIR
 from behavioral_stress.alerting.engine import (
     AlertDecision,
     AlertHistory,
+    JsonlAlertHistory,
     AlertObservation,
     AlertPolicy,
     GeoAwareAlertEngine,
@@ -19,6 +20,7 @@ from behavioral_stress.alerting.reporting import ReportGenerator, StressReport
 __all__ = [
     "AlertDecision",
     "AlertHistory",
+    "JsonlAlertHistory",
     "AlertObservation",
     "AlertPolicy",
     "BSIInput",
