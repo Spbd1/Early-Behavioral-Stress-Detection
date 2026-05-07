@@ -1,8 +1,23 @@
-"""Behavioral Stress Index (BSI) scoring utilities.
+"""MVP Behavioral Stress Index (BSI) scoring utilities.
 
-The BSI is a conservative, composite research signal. It summarizes whether aggregate behavioral
-stress signals increased for a geography; it must not be interpreted as a recession forecast,
-crisis prediction, or individual-level diagnostic.
+The BSI implemented here is a conservative, composite research signal. It summarizes whether
+aggregate behavioral stress signals increased for a geography; it must not be interpreted as a
+recession forecast, crisis prediction, or individual-level diagnostic.
+
+Implementation status versus ``BSI_DESIGN.md``:
+
+Implemented in this MVP:
+- bounded 0-100 score from HMM posterior, anomaly, breadth, persistence, acceleration, data
+  quality, drift confidence, and geographic confidence components;
+- conservative severity bands, uncertainty band, reliability score, top contributors, limitations,
+  and safety warnings in the serialized output.
+
+Deferred from the fuller design:
+- local rolling-baseline computation from raw signal panels;
+- seasonal/holiday/event adjustment;
+- calibrated uncertainty intervals and threshold calibration;
+- volume-aware geographic confidence estimation;
+- transform, weight, calibration, and lineage version metadata.
 """
 
 from __future__ import annotations
@@ -21,7 +36,12 @@ def _scale_0_100(value: float) -> float:
 
 @dataclass(frozen=True)
 class BSIInput:
-    """Inputs needed to compute a geography-specific Behavioral Stress Index."""
+    """Inputs needed to compute the MVP geography-specific Behavioral Stress Index.
+
+    Callers are responsible for supplying already-normalized component scores in ``[0, 1]``.
+    This MVP does not compute local baselines, seasonal adjustments, or calibrated uncertainty from
+    raw Google Trends or other provider observations.
+    """
 
     hmm_stress_posterior: float
     anomaly_strength: float
@@ -38,15 +58,18 @@ class BSIInput:
 
 @dataclass(frozen=True)
 class BSIResult:
-    """Structured Behavioral Stress Index output for APIs, reports, and dashboards."""
+    """Structured MVP Behavioral Stress Index output for APIs, reports, and dashboards."""
 
     score: float
     severity_band: str
     uncertainty_band: tuple[float, float]
+    reliability_score: float
     top_contributing_signals: list[dict[str, float | str]]
     recent_change: float
     explanation: str
     limitations: list[str]
+    warnings: list[str]
+    implementation_label: str
     components: dict[str, float]
 
     def to_dict(self) -> dict[str, object]:
@@ -55,16 +78,32 @@ class BSIResult:
             "score": self.score,
             "severity_band": self.severity_band,
             "uncertainty_band": list(self.uncertainty_band),
+            "reliability_score": self.reliability_score,
             "top_contributing_signals": self.top_contributing_signals,
             "recent_change": self.recent_change,
             "explanation": self.explanation,
             "limitations": self.limitations,
+            "warnings": self.warnings,
+            "implementation_label": self.implementation_label,
             "components": self.components,
         }
 
 
 class BehavioralStressIndex:
-    """Compute a conservative composite index from 0 to 100."""
+    """Compute the MVP conservative composite index from 0 to 100.
+
+    The weights and penalties below are fixed MVP heuristics for deterministic research demos.
+    They are not calibrated production thresholds and do not implement the complete BSI design.
+    """
+
+    IMPLEMENTATION_LABEL = "MVP BSI"
+    EXPERIMENTAL_WARNING = (
+        "Experimental MVP BSI: use only for aggregate research/demo interpretation; not validated "
+        "for operational decisions."
+    )
+    NOT_RECESSION_PREDICTION_WARNING = (
+        "This is an aggregate behavioral stress signal, not a recession prediction."
+    )
 
     WEIGHTS = {
         "hmm_stress_posterior": 0.24,
@@ -98,17 +137,22 @@ class BehavioralStressIndex:
         uncertainty = cls._uncertainty_width(components)
         low = round(max(0.0, score - uncertainty), 2)
         high = round(min(100.0, score + uncertainty), 2)
+        reliability_score = cls._reliability_score(components)
         top_signals = cls._top_signals(inputs.signal_contributions)
         limitations = cls._limitations(inputs.limitations, components)
+        warnings = cls._warnings()
         explanation = cls._explain(score, components, inputs.recent_change, top_signals)
         return BSIResult(
             score=score,
             severity_band=cls.severity_band(score),
             uncertainty_band=(low, high),
+            reliability_score=reliability_score,
             top_contributing_signals=top_signals,
             recent_change=round(float(inputs.recent_change), 2),
             explanation=explanation,
             limitations=limitations,
+            warnings=warnings,
+            implementation_label=cls.IMPLEMENTATION_LABEL,
             components={name: round(value, 4) for name, value in components.items()},
         )
 
@@ -130,6 +174,16 @@ class BehavioralStressIndex:
         return round(5.0 + 18.0 * (1.0 - quality_floor) + 10.0 * drift_uncertainty, 2)
 
     @staticmethod
+    def _reliability_score(components: Mapping[str, float]) -> float:
+        """Return an MVP reliability proxy from quality, drift, and geography components."""
+        reliability = min(
+            components["data_quality"],
+            components["drift_confidence"],
+            components["geographic_confidence"],
+        )
+        return round(reliability, 4)
+
+    @staticmethod
     def _top_signals(contributions: Mapping[str, float]) -> list[dict[str, float | str]]:
         ordered = sorted(contributions.items(), key=lambda item: abs(float(item[1])), reverse=True)
         return [
@@ -147,8 +201,16 @@ class BehavioralStressIndex:
             result.append("Geographic confidence is limited; local data may be sparse or unstable.")
         if components["drift_confidence"] < 0.60:
             result.append("Model drift confidence is low, increasing uncertainty.")
-        result.append("This is an aggregate behavioral stress signal, not a recession prediction.")
+        result.append(BehavioralStressIndex.EXPERIMENTAL_WARNING)
+        result.append(BehavioralStressIndex.NOT_RECESSION_PREDICTION_WARNING)
         return list(dict.fromkeys(result))
+
+    @staticmethod
+    def _warnings() -> list[str]:
+        return [
+            BehavioralStressIndex.EXPERIMENTAL_WARNING,
+            BehavioralStressIndex.NOT_RECESSION_PREDICTION_WARNING,
+        ]
 
     @staticmethod
     def _explain(
