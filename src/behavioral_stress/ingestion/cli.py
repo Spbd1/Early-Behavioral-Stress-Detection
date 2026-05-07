@@ -20,6 +20,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--config", required=True, help="Path to a Google Trends ingestion YAML config"
     )
     trends.add_argument("--log-level", default="INFO", help="Python logging level")
+    trends.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Use the deterministic offline mock Google Trends client and write artifacts "
+            "without network access"
+        ),
+    )
     return parser
 
 
@@ -28,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     configure_structured_logging(getattr(logging, args.log_level.upper()))
     if args.command == "google-trends":
         config = load_ingestion_config(args.config)
+        if args.dry_run:
+            config = config.__class__(**{**config.__dict__, "dry_run": True})
         outputs = GoogleTrendsIngestionPipeline(config).run()
         print(json.dumps(outputs, indent=2, sort_keys=True))
         return 0

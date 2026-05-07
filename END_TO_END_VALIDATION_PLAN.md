@@ -223,3 +223,19 @@ docker build -f docker/Dockerfile .
 - Production authentication, TLS, service-level objectives, rollback automation, or managed persistence.
 - New UI features beyond honest labeling, schema compatibility, and smoke-tested rendering.
 - Replacing the current workflow, alerting, or dashboard architecture.
+
+## Google Trends ingestion offline validation addendum
+
+Required validation path for this milestone:
+
+1. Run compile checks for `src`, `scripts`, and `tests`.
+2. Run ingestion-focused pytest coverage without pytrends or live Google Trends.
+3. Verify `behavioral-stress-ingest google-trends --help` exposes dry-run usage.
+4. Execute a dry-run/mock ingestion with no internet dependency and inspect/validate raw, processed, and metadata artifacts.
+
+Acceptance criteria:
+
+- Package imports and tests pass without pytrends installed.
+- Live ingestion fails early with a clear optional-dependency message if pytrends is absent.
+- Dry-run output contains provider-shaped raw CSV files, processed long-format panel files, and metadata JSON.
+- Metadata preserves geography fields and warnings, and documentation states that raw Google Trends values should not be naively compared across regions.

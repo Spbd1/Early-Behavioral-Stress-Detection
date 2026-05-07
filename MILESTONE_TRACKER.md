@@ -97,3 +97,21 @@ Completed on 2026-05-07:
 - Added geo-safety tests for low-confidence city/metro and unsupported geography suppressions/warnings.
 
 Still deferred: Google Trends ingestion changes, frontend architecture changes, calibrated alert thresholds, provider-code validation, and live/provider integration validation.
+
+## Google Trends ingestion reliability/offline-testability milestone
+
+Status: completed for offline/mock ingestion reliability on 2026-05-07.
+
+Evidence added:
+
+- Optional pytrends handling with explicit live-ingestion error messaging.
+- Deterministic mock `TrendsClient` and dry-run CLI/config path.
+- Raw, processed, and metadata artifact schema validation.
+- Geography metadata preservation plus unsupported/low-volume warnings.
+- Offline tests for import behavior, dry-run artifact creation, CLI help, validators, retries, batching, caching, and normalization.
+
+Not completed / not claimed:
+
+- No live Google Trends integration validation.
+- No secrets or credentials added.
+- No production reliability guarantee for pytrends.

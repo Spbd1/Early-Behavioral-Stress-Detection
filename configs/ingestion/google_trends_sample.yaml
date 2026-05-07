@@ -20,6 +20,7 @@ google_trends:
   overlap_days: 21
   language: en-US
   timezone: 0
+  dry_run: false
   storage:
     raw_directory: data/raw/google_trends
     processed_directory: data/processed/google_trends

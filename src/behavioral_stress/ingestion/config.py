@@ -57,7 +57,7 @@ class GoogleTrendsIngestionConfig:
     """End-to-end Google Trends ingestion configuration."""
 
     keywords: list[str]
-    regions: list[str] = field(default_factory=lambda: [""])
+    regions: list[str | dict[str, Any]] = field(default_factory=lambda: [""])
     timeframe: str = "today 5-y"
     historical_timeframes: list[str] = field(default_factory=list)
     category: int = 0
@@ -73,6 +73,7 @@ class GoogleTrendsIngestionConfig:
     retry: RetryConfig = field(default_factory=RetryConfig)
     rate_limit: RateLimitConfig = field(default_factory=RateLimitConfig)
     validation: ValidationConfig = field(default_factory=ValidationConfig)
+    dry_run: bool = False
 
     def all_timeframes(self) -> list[str]:
         """Return historical windows followed by the current/incremental window."""

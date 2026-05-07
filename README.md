@@ -111,11 +111,11 @@ This repository includes a Google Trends ingestion layer for aggregate, keyword-
 pip install -e .[ingestion]
 ```
 
-Run the experimental sample pipeline with either entry point:
+Run the experimental sample pipeline with either entry point. Use `--dry-run` for deterministic offline/mock artifact generation that does not require pytrends or network access:
 
 ```bash
-behavioral-stress-ingest google-trends --config configs/ingestion/google_trends_sample.yaml
-python scripts/run_google_trends_ingestion.py --config configs/ingestion/google_trends_sample.yaml
+behavioral-stress-ingest google-trends --config configs/ingestion/google_trends_sample.yaml --dry-run
+python scripts/run_google_trends_ingestion.py --config configs/ingestion/google_trends_sample.yaml --dry-run
 ```
 
 The experimental ingestion architecture intentionally separates provider coupling from durable artifacts:
@@ -127,20 +127,21 @@ The experimental ingestion architecture intentionally separates provider couplin
 - `behavioral_stress.ingestion.trends.GoogleTrendsIngestionPipeline` orchestrates historical and
   incremental pulls, regional loops, keyword batching, retry/backoff, rate limiting, raw batch
   writes, processed panel generation, and run metadata.
-- `behavioral_stress.ingestion.trends.PytrendsClient` is the default live connector, while tests
-  can pass any object that implements the small `TrendsClient` protocol.
+- `behavioral_stress.ingestion.trends.PytrendsClient` is the default live connector and raises
+  a clear optional-dependency error if pytrends is missing. `MockTrendsClient` backs dry-run
+  ingestion, and tests can pass any object that implements the small `TrendsClient` protocol.
 - `behavioral_stress.ingestion.logging` emits JSON logs for batch status, cache hits, retry
   attempts, and run IDs.
 
-Raw provider responses are written under `data/raw/google_trends`, processed long-format panels
-under `data/processed/google_trends`, and run metadata under `data/metadata/google_trends` by
+Raw provider responses are schema-checked and written under `data/raw/google_trends`, processed long-format panels
+under `data/processed/google_trends`, and validated run metadata under `data/metadata/google_trends` by
 default. Processed rows contain `date`, `keyword`, `value_raw`, `value_normalized`,
 `anchor_value`, `region`, and `timeframe`.
 
 ### Ingestion tradeoffs and limitations
 
 Google Trends data is sampled and scaled by Google rather than reported as absolute query volume.
-Values are relative to the requested keyword set, region, and time window; low-volume terms may be
+Values are relative to the requested keyword set, region, and time window, so raw values should not be naively compared across regions; low-volume terms may be
 rounded to zero or omitted; repeated pulls can change; long windows may be returned at coarser
 resolution; and Google can throttle, block, or alter unofficial access behavior. The pipeline
 therefore treats Google Trends as a noisy aggregate research signal, not a stable measurement

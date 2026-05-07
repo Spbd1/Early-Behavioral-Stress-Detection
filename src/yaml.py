@@ -16,8 +16,19 @@ def _parse_scalar(text: str) -> Any:
         return False
     if text.lower() in {"null", "none"}:
         return None
-    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+    if (text.startswith('"') and text.endswith('"')) or (
+        text.startswith("'") and text.endswith("'")
+    ):
         return text[1:-1]
+    if text.startswith("[") and text.endswith("]"):
+        inner = text[1:-1].strip()
+        if not inner:
+            return []
+        try:
+            parsed = ast.literal_eval(text)
+        except (ValueError, SyntaxError):
+            return [_parse_scalar(part.strip()) for part in inner.split(",")]
+        return parsed
     try:
         return int(text)
     except ValueError:
@@ -35,21 +46,44 @@ def safe_load(text: str) -> dict[str, Any]:
     if stripped.startswith("{"):
         return json.loads(text)
     root: dict[str, Any] = {}
-    stack: list[tuple[int, dict[str, Any]]] = [(-1, root)]
+    stack: list[tuple[int, Any, str | None]] = [(-1, root, None)]
     for raw in text.splitlines():
         if not raw.strip() or raw.lstrip().startswith("#"):
             continue
         indent = len(raw) - len(raw.lstrip(" "))
-        key, sep, value = raw.strip().partition(":")
-        if not sep:
-            continue
+        stripped_line = raw.strip()
         while stack and indent <= stack[-1][0]:
             stack.pop()
         parent = stack[-1][1]
+
+        if stripped_line.startswith("- "):
+            value_text = stripped_line[2:].strip()
+            if not isinstance(parent, list):
+                container_indent, container_parent, container_key = stack[-1]
+                if (
+                    isinstance(container_parent, dict)
+                    and not container_parent
+                    and container_key is not None
+                    and len(stack) >= 2
+                    and isinstance(stack[-2][1], dict)
+                ):
+                    parent = []
+                    stack[-2][1][container_key] = parent
+                    stack[-1] = (container_indent, parent, container_key)
+                else:
+                    continue
+            parent.append(_parse_scalar(value_text))
+            continue
+
+        key, sep, value = stripped_line.partition(":")
+        if not sep:
+            continue
         parsed = _parse_scalar(value)
-        parent[key] = parsed
-        if parsed == {} and value.strip() == "":
-            stack.append((indent, parsed))
+        if isinstance(parent, dict):
+            parent[key] = parsed
+            if parsed == {} and value.strip() == "":
+                stack.append((indent, parent, key))
+                stack.append((indent, parsed, key))
     return root
 
 
