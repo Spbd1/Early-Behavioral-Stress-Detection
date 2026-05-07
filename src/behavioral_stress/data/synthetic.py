@@ -1,9 +1,10 @@
 """Synthetic aggregate behavioral stress data generation."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
 import random
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -80,14 +81,7 @@ def generate_synthetic_regime_data(
             effect = _level_regime_effect(level, stress, feature_scale)
             heterogeneity = rng.gauss(0.0, 0.22)
             noise = rng.gauss(0.0, 1.05 + 0.20 * stress)
-            value = (
-                baseline
-                + effect
-                + drift * (feature + 1)
-                + common_shock
-                + heterogeneity
-                + noise
-            )
+            value = baseline + effect + drift * (feature + 1) + common_shock + heterogeneity + noise
             if include_count_features and feature % 4 == 3:
                 value = max(0.0, round(value))
             row.append(round(value, 6))

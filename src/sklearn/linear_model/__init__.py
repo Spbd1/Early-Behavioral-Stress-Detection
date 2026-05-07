@@ -1,4 +1,5 @@
 """Minimal linear-model shims."""
+
 from __future__ import annotations
 
 

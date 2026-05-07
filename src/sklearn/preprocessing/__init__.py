@@ -1,4 +1,5 @@
 """Minimal preprocessing shims."""
+
 from __future__ import annotations
 
 

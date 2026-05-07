@@ -1,4 +1,5 @@
 """Langflow wrapper for preprocessing aggregate synthetic observations."""
+
 from __future__ import annotations
 
 from typing import Any

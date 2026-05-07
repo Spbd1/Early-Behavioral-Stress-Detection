@@ -1,12 +1,14 @@
 """Behavioral signal ontology definitions for aggregate synthetic traces."""
+
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import json
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+
 import yaml
 
 REQUIRED_CODEBOOK_COLUMNS = [
@@ -68,18 +70,18 @@ class BehavioralOntology:
         Path(path).write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "BehavioralOntology":
+    def from_yaml(cls, path: str | Path) -> BehavioralOntology:
         """Load ontology signals from YAML."""
         payload = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
         return cls.from_dict(payload)
 
     @classmethod
-    def from_json(cls, path: str | Path) -> "BehavioralOntology":
+    def from_json(cls, path: str | Path) -> BehavioralOntology:
         """Load ontology signals from JSON."""
         return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "BehavioralOntology":
+    def from_dict(cls, payload: dict[str, Any]) -> BehavioralOntology:
         """Create an ontology from a dictionary payload."""
         return cls([BehavioralSignal(**item) for item in payload.get("signals", [])])
 

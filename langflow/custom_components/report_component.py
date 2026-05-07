@@ -1,4 +1,5 @@
 """Langflow report/output wrapper for the package synthetic workflow."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,6 +27,10 @@ class ReportComponent:
         else:
             result = dict(payload)
         result["warning"] = WORKFLOW_WARNING
-        result["dashboard_command"] = "streamlit run src/behavioral_stress/visualization/dashboard.py"
-        result["fallback_command"] = "python scripts/run_synthetic_demo.py --config configs/synthetic.yaml"
+        result["dashboard_command"] = (
+            "streamlit run src/behavioral_stress/visualization/dashboard.py"
+        )
+        result["fallback_command"] = (
+            "python scripts/run_synthetic_demo.py --config configs/synthetic.yaml"
+        )
         return result

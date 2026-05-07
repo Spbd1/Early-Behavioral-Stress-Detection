@@ -1,7 +1,6 @@
 """Minimal scipy.stats shims."""
-from __future__ import annotations
 
-import math
+from __future__ import annotations
 
 
 class multivariate_normal:

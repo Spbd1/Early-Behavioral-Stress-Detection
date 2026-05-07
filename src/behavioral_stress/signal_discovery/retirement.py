@@ -5,10 +5,11 @@ review only.  They never delete, drop, or retire a feature automatically.
 Operational thresholds should be selected inside rolling-origin or nested
 validation, not tuned on a final test set.
 """
+
 from __future__ import annotations
 
 import math
-from typing import Iterable
+from collections.abc import Iterable
 
 _EPS = 1e-9
 
@@ -28,9 +29,7 @@ def kl_divergence_gaussian(old: Iterable[float], new: Iterable[float]) -> float:
     new_var = max(new_var, _EPS)
 
     divergence = 0.5 * (
-        math.log(new_var / old_var)
-        + (old_var + (old_mean - new_mean) ** 2) / new_var
-        - 1.0
+        math.log(new_var / old_var) + (old_var + (old_mean - new_mean) ** 2) / new_var - 1.0
     )
     if not math.isfinite(divergence):
         return math.inf

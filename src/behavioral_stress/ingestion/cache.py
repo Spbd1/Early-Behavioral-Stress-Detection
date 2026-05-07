@@ -1,4 +1,5 @@
 """Small filesystem cache used by ingestion connectors."""
+
 from __future__ import annotations
 
 import hashlib

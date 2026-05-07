@@ -1,4 +1,5 @@
 """Data lineage and model-version manifests."""
+
 from __future__ import annotations
 
 import hashlib

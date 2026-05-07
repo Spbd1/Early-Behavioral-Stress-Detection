@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Build static dashboard JSON for browser-only deployments."""
+
 from __future__ import annotations
 
 import argparse

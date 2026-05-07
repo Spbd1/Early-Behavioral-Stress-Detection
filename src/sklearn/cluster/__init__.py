@@ -1,4 +1,5 @@
 """Minimal clustering shims."""
+
 from __future__ import annotations
 
 

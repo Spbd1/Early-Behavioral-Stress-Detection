@@ -1,4 +1,5 @@
 """Strict-enough configuration validation for experimental production usage."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

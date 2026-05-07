@@ -1,4 +1,5 @@
 """Minimal stdlib API/static server for the browser dashboard."""
+
 from __future__ import annotations
 
 import argparse

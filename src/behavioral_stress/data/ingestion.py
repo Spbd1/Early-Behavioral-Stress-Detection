@@ -3,6 +3,7 @@
 Real public-data connectors are intentionally not implemented in the first deliverable to avoid
 hallucinated data sources and unclear licensing. Use synthetic data by default.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Container and CI health check entry point."""
+
 from __future__ import annotations
 
 import json

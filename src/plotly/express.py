@@ -1,4 +1,5 @@
 """Minimal plotly.express shims."""
+
 from __future__ import annotations
 
 

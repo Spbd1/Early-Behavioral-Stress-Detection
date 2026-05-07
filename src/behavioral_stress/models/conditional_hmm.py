@@ -1,7 +1,9 @@
 """Runnable conditional HMM prototype for aggregate-regime experiments."""
+
 from __future__ import annotations
 
 import numpy as np
+
 from scipy.special import softmax
 from sklearn.cluster import KMeans
 
@@ -22,16 +24,23 @@ class ConditionalHMM:
         self.sigma_: np.ndarray | None = None
         self.initial_probs_: np.ndarray | None = None
 
-    def fit(self, observations: np.ndarray, covariates: np.ndarray) -> "ConditionalHMM":
+    def fit(self, observations: np.ndarray, covariates: np.ndarray) -> ConditionalHMM:
         """Initialize a clear, testable conditional HMM prototype."""
         y = np.asarray(observations, dtype=float)
         y = y.reshape(-1, 1) if y.ndim == 1 else y
         x = np.asarray(covariates, dtype=float)
         x = x.reshape(-1, 1) if x.ndim == 1 else x
-        labels = KMeans(n_clusters=self.n_states, n_init=10, random_state=self.random_seed).fit_predict(y)
+        labels = KMeans(
+            n_clusters=self.n_states, n_init=10, random_state=self.random_seed
+        ).fit_predict(y)
         self.initial_probs_ = np.full(self.n_states, 1 / self.n_states)
         self.beta_ = np.zeros((self.n_states, self.n_states, x.shape[1] + 1))
-        self.mu_ = np.vstack([y[labels == i].mean(axis=0) if np.any(labels == i) else y.mean(axis=0) for i in range(self.n_states)])
+        self.mu_ = np.vstack(
+            [
+                y[labels == i].mean(axis=0) if np.any(labels == i) else y.mean(axis=0)
+                for i in range(self.n_states)
+            ]
+        )
         self.gamma_ = np.zeros((self.n_states, y.shape[1], x.shape[1]))
         self.sigma_ = np.stack([np.eye(y.shape[1]) for _ in range(self.n_states)])
         return self
