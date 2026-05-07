@@ -8,11 +8,61 @@ Update 2026-05-07: Documentation and BSI consistency fixes have been applied for
 
 Update 2026-05-07 (alert persistence and offline smoke validation): A small JSONL-backed alert history store now exists alongside the default in-memory store. Alert histories can be loaded/replayed from serialized decision records, and the offline smoke test exercises synthetic/mocked observations through MVP BSI computation, geo-aware alert decisions, conservative report generation, and dashboard-ready JSON payload serialization without live Google Trends, API keys, or network access. Report language guardrails now assert the safe phrase “behavioral stress signal increased” and reject the unsafe phrase “recession is coming.” Low-confidence city/metro and unsupported geography cases are covered by tests that warn or suppress instead of emitting misleading high-confidence alerts. Google Trends ingestion now has offline mock/dry-run reliability fixes; frontend architecture remains unchanged.
 
+
+## Final local validation update — 2026-05-07
+
+Scope: final local validation only; no new features were added. Validation was run in the local container on Python 3.14.4 with offline/mock paths where possible.
+
+### Status classification
+
+- **Project stage:** experimental MVP / research prototype.
+- **Production readiness:** **not production-ready**.
+- **Reason for conservative classification:** offline synthetic, mock-ingestion, dashboard payload, package-import, CLI-help, compile, and pytest checks pass locally, but live Google Trends ingestion, prospective real-world validation, calibrated thresholds, full browser automation, deployment rollback evidence, privacy/legal review, and model-risk approval remain unvalidated.
+
+### Passed local checks
+
+- `python -m compileall src scripts tests` completed successfully.
+- `pytest` completed successfully: 50 passed.
+- `PYTHONPATH=src python - <<'PY' ... import behavioral_stress ... PY` completed successfully.
+- CLI help checks completed successfully for ingestion CLI, Google Trends wrapper, dashboard server, dashboard helper, frontend data builder, synthetic demo, and validation runner.
+- Mock/offline Google Trends ingestion dry-run completed successfully using a temporary config and temporary output directories.
+- Dashboard data build completed successfully to a temporary `dashboard.json` and produced the expected `dashboard.v1` top-level contract keys.
+- Frontend/static smoke check completed successfully for required static files, asset references, and basic static-dashboard assumptions.
+- `PYTHONPATH=src python scripts/run_validation.py --config <temporary-validation-config>` completed successfully and wrote validation metrics to a temporary output directory.
+- `PYTHONPATH=src python scripts/run_synthetic_demo.py --config <temporary-synthetic-config>` completed successfully and wrote synthetic demo artifacts to a temporary output directory.
+
+### Checks that did not pass
+
+- `ruff check` was available but did **not** pass. It reported 120 lint violations, primarily `E501` line-length issues, import-order issues, quoted type annotations, and one unused import. This is a code-quality failure, not an environment limitation.
+- A first ad hoc dashboard payload assertion expected outdated keys (`responsible_use`, `series`, `metrics`) and failed. The check was corrected to the current `dashboard.v1` keys (`system`, `bsi`, `posterior`, `alerts`, `top_signals`) and then passed. The failed ad hoc assertion is not treated as a product failure, but it confirms that consumers must use the current dashboard schema.
+
+### Not run / not validated
+
+- Live Google Trends / pytrends ingestion was not run; only offline mock/dry-run ingestion was validated.
+- Full browser automation in Chrome or another real browser was not run.
+- Networked deployment, Docker runtime, CI pipeline, rollback, monitoring, privacy/legal review, and model-risk approval were not run locally.
+- No prospective real-world economic-stress validation or calibrated alert-threshold approval was performed.
+
+### Remaining risks
+
+- Real provider availability, scaling semantics, rate limits, and terms-of-service compliance are unvalidated.
+- The BSI and alert reliability/uncertainty fields remain MVP heuristics rather than calibrated scientific confidence intervals.
+- Dashboard geography rows are synthetic/demo metadata and should not be interpreted as validated geospatial monitoring.
+- Lint debt remains significant because `ruff check` fails.
+- Python 3.14.4 local validation is useful but does not replace the declared supported Python 3.10/3.11 compatibility matrix.
+
+### Remaining placeholders / deferred work
+
+- Synthetic-first configs and dashboards remain the validated path.
+- Real public-data connectors outside the experimental Google Trends path remain intentionally deferred.
+- The Langflow scaffold remains a scaffold/demo path, not a validated orchestration deployment.
+- Full BSI design-conformance work remains deferred: local baselines, robust anomalies, calibrated uncertainty, confidence, cross-signal agreement, and alert-threshold approval.
+
 ## Executive summary
 
 This repository remains an **experimental research prototype**, not a production system. The most mature path is the synthetic-data workflow around the adaptive HMM, synthetic validation artifacts, static/browser dashboard payload generation, and basic operational metadata. Several recently added capabilities are present as useful MVP modules, but they are not integrated into a tested end-to-end live pipeline.
 
-The largest correctness problem found during audit is that the current test suite fails in Google Trends ingestion tests. The failures indicate both a YAML parsing/config-loading problem and a validation-threshold expectation mismatch. Because CI runs `pytest`, the current main branch should be treated as **not green** until fixed.
+Historical audit note: Google Trends ingestion tests previously failed due to YAML/config parsing and validation-threshold issues. In the final local validation run on 2026-05-07, `pytest` passed offline with 50 tests, including Google Trends ingestion tests. Live/provider ingestion remains unvalidated.
 
 The second major issue is that `BSI_DESIGN.md` is explicitly design-only and describes a richer, local-baseline, robust-anomaly, cross-signal-agreement, confidence, calibration, and uncertainty framework than the implemented `BehavioralStressIndex`. The implementation is now labeled as an MVP scalar combiner over precomputed inputs; it documents deferred design components and serializes score, severity band, uncertainty band, reliability proxy, top contributors, limitations, experimental warnings, and a not-recession-prediction warning. It still does not implement most of the design document's upstream feature construction or calibrated uncertainty.
 
@@ -28,7 +78,7 @@ The third major issue is that the Chrome-friendly dashboard/API path is primaril
 | Ontology-guided keyword generation | MVP IMPLEMENTED | Deterministic ontology, local RAG retrieval, candidates, validation, review states, and registry persistence exist. No LLM integration or live keyword performance validation. |
 | Local RAG grounding | MVP IMPLEMENTED | Local JSONL lexical retriever exists and is appropriately scoped to explanation/grounding only. It is not semantic RAG and has no citation-quality validation. |
 | Geo-aware keyword support | PARTIAL | Keyword geo metadata and registry support stable codes, support flags, low-volume flags, and locale. Provider-code validation and provider support checks are manual. |
-| Google Trends ingestion | BROKEN/EXPERIMENTAL | Pipeline exists, but config parsing tests fail, sample YAML uses block lists unsupported by the local YAML shim, and live pytrends behavior is unvalidated. Documentation now labels real ingestion as experimental and outside the validated synthetic demo path. |
+| Google Trends ingestion | EXPERIMENTAL / OFFLINE-MOCK VALIDATED | Pipeline exists, but config parsing tests fail, sample YAML uses block lists unsupported by the local YAML shim, and live pytrends behavior is unvalidated. Documentation now labels real ingestion as experimental and outside the validated synthetic demo path. |
 | Optional pytrends dependency handling | PARTIAL | `pytrends` is optional extra, but missing dependency raises at pipeline/client construction without a tailored diagnostic or preflight check. |
 | BSI design document | COMPLETE as design-only | The document is clear that it is design-only and provides rich requirements. It should not be read as implemented. |
 | BSI implementation | MVP IMPLEMENTED / PARTIAL DESIGN COVERAGE | A bounded weighted composite exists and is explicitly labeled MVP BSI. The serialized output includes score, severity band, uncertainty band, reliability proxy, top contributors, limitations, experimental warnings, not-recession-prediction warning, implementation label, and components. It still omits most design-spec feature generation, calibration, volume-aware reliability, and robust uncertainty. |
@@ -314,7 +364,7 @@ Unsafe for production:
 
 ## Bottom line
 
-Strict classification of the whole project: **MVP IMPLEMENTED for synthetic research; PARTIAL/BROKEN for live Google Trends + BSI + geo-alert production pipeline; not production-ready.**
+Strict classification of the whole project: **experimental MVP / research prototype for synthetic and offline/mock paths; partial and unvalidated for live Google Trends + calibrated BSI + geo-alert production pipeline; not production-ready.**
 
 Before any production claim, the project needs a green test suite, fixed YAML/config loading, explicit pytrends preflight handling, live ingestion validation, BSI design/implementation reconciliation, persistent alert history, dashboard/API schema alignment, durable lineage across all outputs, calibrated thresholds, security controls, and full end-to-end tests.
 

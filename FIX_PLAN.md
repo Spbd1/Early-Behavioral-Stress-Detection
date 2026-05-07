@@ -4,6 +4,56 @@ Source audit: `CURRENT_STATE_AUDIT.md` dated 2026-05-07. This plan is intentiona
 
 Update 2026-05-07: The documentation and BSI consistency slice of A2/C1/C2/E2 has been implemented. README now labels the validated runnable demo as synthetic and real Google Trends ingestion as experimental. BSI is labeled MVP, documents implemented/deferred design components, and serializes reliability, warnings, limitations, top contributors, an experimental warning, and a not-recession-prediction warning. Alert persistence, Google Trends ingestion behavior, and frontend behavior were intentionally not changed.
 
+
+## Final local validation update — 2026-05-07
+
+Scope: final local validation only; no new features were added. Validation was run in the local container on Python 3.14.4 with offline/mock paths where possible.
+
+### Status classification
+
+- **Project stage:** experimental MVP / research prototype.
+- **Production readiness:** **not production-ready**.
+- **Reason for conservative classification:** offline synthetic, mock-ingestion, dashboard payload, package-import, CLI-help, compile, and pytest checks pass locally, but live Google Trends ingestion, prospective real-world validation, calibrated thresholds, full browser automation, deployment rollback evidence, privacy/legal review, and model-risk approval remain unvalidated.
+
+### Passed local checks
+
+- `python -m compileall src scripts tests` completed successfully.
+- `pytest` completed successfully: 50 passed.
+- `PYTHONPATH=src python - <<'PY' ... import behavioral_stress ... PY` completed successfully.
+- CLI help checks completed successfully for ingestion CLI, Google Trends wrapper, dashboard server, dashboard helper, frontend data builder, synthetic demo, and validation runner.
+- Mock/offline Google Trends ingestion dry-run completed successfully using a temporary config and temporary output directories.
+- Dashboard data build completed successfully to a temporary `dashboard.json` and produced the expected `dashboard.v1` top-level contract keys.
+- Frontend/static smoke check completed successfully for required static files, asset references, and basic static-dashboard assumptions.
+- `PYTHONPATH=src python scripts/run_validation.py --config <temporary-validation-config>` completed successfully and wrote validation metrics to a temporary output directory.
+- `PYTHONPATH=src python scripts/run_synthetic_demo.py --config <temporary-synthetic-config>` completed successfully and wrote synthetic demo artifacts to a temporary output directory.
+
+### Checks that did not pass
+
+- `ruff check` was available but did **not** pass. It reported 120 lint violations, primarily `E501` line-length issues, import-order issues, quoted type annotations, and one unused import. This is a code-quality failure, not an environment limitation.
+- A first ad hoc dashboard payload assertion expected outdated keys (`responsible_use`, `series`, `metrics`) and failed. The check was corrected to the current `dashboard.v1` keys (`system`, `bsi`, `posterior`, `alerts`, `top_signals`) and then passed. The failed ad hoc assertion is not treated as a product failure, but it confirms that consumers must use the current dashboard schema.
+
+### Not run / not validated
+
+- Live Google Trends / pytrends ingestion was not run; only offline mock/dry-run ingestion was validated.
+- Full browser automation in Chrome or another real browser was not run.
+- Networked deployment, Docker runtime, CI pipeline, rollback, monitoring, privacy/legal review, and model-risk approval were not run locally.
+- No prospective real-world economic-stress validation or calibrated alert-threshold approval was performed.
+
+### Remaining risks
+
+- Real provider availability, scaling semantics, rate limits, and terms-of-service compliance are unvalidated.
+- The BSI and alert reliability/uncertainty fields remain MVP heuristics rather than calibrated scientific confidence intervals.
+- Dashboard geography rows are synthetic/demo metadata and should not be interpreted as validated geospatial monitoring.
+- Lint debt remains significant because `ruff check` fails.
+- Python 3.14.4 local validation is useful but does not replace the declared supported Python 3.10/3.11 compatibility matrix.
+
+### Remaining placeholders / deferred work
+
+- Synthetic-first configs and dashboards remain the validated path.
+- Real public-data connectors outside the experimental Google Trends path remain intentionally deferred.
+- The Langflow scaffold remains a scaffold/demo path, not a validated orchestration deployment.
+- Full BSI design-conformance work remains deferred: local baselines, robust anomalies, calibrated uncertainty, confidence, cross-signal agreement, and alert-threshold approval.
+
 ## Prioritization principles
 
 1. Restore correctness first: make required offline tests deterministic and green before adding functionality.
@@ -23,13 +73,14 @@ Update 2026-05-07: The documentation and BSI consistency slice of A2/C1/C2/E2 ha
 
 ### A1. P0 — Restore Google Trends ingestion config correctness
 
-- **Problem:** Google Trends ingestion tests currently fail due to YAML/config parsing and threshold expectation mismatches.
+- **Status update 2026-05-07:** Offline Google Trends ingestion tests now pass in the final local validation run. Live/provider ingestion remains unvalidated.
+- **Problem:** This item was originally opened because Google Trends ingestion tests failed due to YAML/config parsing and threshold expectation mismatches.
 - **Why it matters:** The repository cannot be considered green while default `pytest` fails, and ingestion documentation cannot be trusted if sample config cannot load correctly.
 - **Files likely affected:** `src/yaml.py`, `src/behavioral_stress/ingestion/config.py`, `src/behavioral_stress/ingestion/trends.py`, `configs/ingestion/google_trends_sample.yaml`, `tests/test_google_trends_ingestion.py`.
 - **Risk level:** High. Config parsing changes can affect every command that loads YAML.
 - **Implementation approach:** Add narrowly scoped support for the YAML structures used by repository configs, or replace the local shim path with a reliable parser already declared as a dependency. Normalize loaded config fields into typed lists and numbers before validation. Align threshold validation tests with intended semantics rather than implementation accidents.
 - **Validation method:** Run the targeted Google Trends ingestion tests, then full offline `pytest`.
-- **Expected result:** Sample ingestion YAML loads into typed structures, threshold validation is deterministic, and offline tests pass without network access.
+- **Expected result:** Sample ingestion YAML loads into typed structures, threshold validation is deterministic, and offline tests pass without network access. Final local validation confirms this for offline/mock paths only; live pytrends behavior is still out of scope.
 - **Requires network access:** No.
 - **Requires external credentials:** No.
 
