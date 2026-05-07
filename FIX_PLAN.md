@@ -151,7 +151,7 @@ Update 2026-05-07: The documentation and BSI consistency slice of A2/C1/C2/E2 ha
 
 ## D. End-to-end pipeline gaps
 
-### D1. P1 — Create one offline pipeline path from synthetic observations to report and dashboard payload
+### D1. P1 — Create one offline pipeline path from synthetic observations to report and dashboard payload — COMPLETED 2026-05-07
 
 - **Problem:** Synthetic workflow, HMM, BSI, alerting, reporting, dashboard API, and frontend smoke tests exist as separate pieces, but not as one coherent validated path.
 - **Why it matters:** A minimal end-to-end path is the fastest way to detect schema drift and correctness regressions.
@@ -160,6 +160,7 @@ Update 2026-05-07: The documentation and BSI consistency slice of A2/C1/C2/E2 ha
 - **Implementation approach:** Add a thin orchestrator or test-only adapter that passes synthetic observations through HMM/posterior or a deterministic mocked posterior, computes BSI, evaluates alert decision, generates a report, builds dashboard JSON, and validates frontend assets. Do not replace existing architecture.
 - **Validation method:** Implement the minimal path described in `END_TO_END_VALIDATION_PLAN.md` as an offline test.
 - **Expected result:** One command validates that major modules can interoperate with stable schemas.
+- **Implemented 2026-05-07:** `tests/test_alert_persistence_and_smoke.py` now drives synthetic/mocked observations through BSI computation, alert decisioning, report generation, and dashboard-ready JSON serialization without live providers or API keys.
 - **Requires network access:** No.
 - **Requires external credentials:** No.
 
@@ -253,13 +254,14 @@ Update 2026-05-07: The documentation and BSI consistency slice of A2/C1/C2/E2 ha
 
 ## F. Production hardening gaps
 
-### F1. P1 — Add persistent alert history design before implementation
+### F1. P1 — Add persistent alert history — COMPLETED 2026-05-07
 
 - **Problem:** Alert history is process-local and disappears on restart.
 - **Why it matters:** Cooldowns, duplicate suppression, and audit trails cannot survive deployments.
 - **Files likely affected:** `src/behavioral_stress/alerting/engine.py`, `src/behavioral_stress/alerting/geo.py`, docs under `docs/operations/`, future tests.
 - **Risk level:** High if implemented without design; medium as planning work.
 - **Implementation approach:** Define an interface for durable alert history and replay semantics before selecting a backend. Keep in-memory implementation as default for offline demos.
+- **Implemented 2026-05-07:** `AlertHistory` remains in-memory and gained load/replay semantics; `JsonlAlertHistory` provides a small JSONL-backed persistent store with reload/replay tests.
 - **Validation method:** Interface tests using a temporary file or in-memory fake; future restart simulation tests.
 - **Expected result:** A migration path exists without forcing production infrastructure into the prototype.
 - **Requires network access:** No for file-backed tests; backend-specific options may vary later.
@@ -348,6 +350,7 @@ Update 2026-05-07: The documentation and BSI consistency slice of A2/C1/C2/E2 ha
 - **Implementation approach:** Add explicit provider-support checks and store support status in metadata. Use opt-in live validation for provider support.
 - **Validation method:** Offline metadata tests plus live provider support checks behind opt-in marker.
 - **Expected result:** Unsupported or low-volume geographies are flagged before scoring/alerting.
+- **Implemented 2026-05-07:** Alert-engine tests now verify low-confidence metro/city data and unsupported geographies warn or suppress instead of producing misleading high-confidence alerts. Provider-code validation remains future work.
 - **Requires network access:** Yes for live provider validation.
 - **Requires external credentials:** No for public Google Trends access, subject to provider behavior.
 

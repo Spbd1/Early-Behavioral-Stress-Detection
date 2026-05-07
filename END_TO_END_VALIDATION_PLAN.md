@@ -27,6 +27,18 @@ The purpose is correctness, observability, and reproducibility. This is not a pr
 - Must clearly label outputs as `synthetic_only` or `demo` until live validation exists.
 - Must fail on schema drift between backend payloads and frontend expectations.
 
+## Implementation update — 2026-05-07
+
+The first offline smoke path is now implemented in `tests/test_alert_persistence_and_smoke.py`. It uses synthetic/mocked observations only and validates:
+
+1. MVP BSI computation through `GeoAwareAlertEngine.evaluate`.
+2. Alert decision generation with suppressions/warnings preserved.
+3. Conservative report generation with safe wording.
+4. Dashboard-ready JSON payload serialization via `GeoAwareAlertEngine.dashboard_payload`.
+5. No live Google Trends, API keys, or network access.
+
+The same test module also covers JSONL alert persistence/replay and geo-safety warning/suppression behavior for low-confidence city/metro and unsupported geographies. Google Trends ingestion and frontend architecture are intentionally unchanged.
+
 ## Minimal validation path overview
 
 | Stage | Input | Output | Primary validation |

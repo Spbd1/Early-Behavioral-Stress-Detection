@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from behavioral_stress.alerting.bsi import BehavioralStressIndex, BSIInput, BSIResult
 from behavioral_stress.alerting.explainability import (
@@ -86,13 +88,30 @@ class AlertPolicy:
 
 
 class AlertHistory:
-    """In-memory alert history store keyed by geography."""
+    """In-memory alert history store keyed by geography.
 
-    def __init__(self) -> None:
+    The in-memory implementation remains the default so unit tests and offline demos
+    do not need filesystem access. It also provides replay/load semantics used by
+    durable stores and validation tests.
+    """
+
+    def __init__(self, events: Sequence[Mapping[str, object]] | None = None) -> None:
         self._events: dict[str, list[dict[str, object]]] = {}
+        self._sequence: list[dict[str, object]] = []
+        if events:
+            self.load(events)
 
     def add(self, decision: AlertDecision) -> None:
-        self._events.setdefault(str(decision.geo["geo_id"]), []).append(decision.to_dict())
+        self._add_event(decision.to_dict())
+
+    def load(self, events: Sequence[Mapping[str, object]]) -> None:
+        """Load previously serialized alert decision dictionaries."""
+        for event in events:
+            self._add_event(dict(event))
+
+    def replay(self) -> list[dict[str, object]]:
+        """Return all loaded/recorded events in insertion order."""
+        return list(self._sequence)
 
     def recent(self, geo_id: str, limit: int = 10) -> list[dict[str, object]]:
         return self._events.get(geo_id, [])[-limit:]
@@ -102,6 +121,51 @@ class AlertHistory:
             if ALERT_ORDER.get(str(event["level"]), 0) > 0:
                 return event
         return None
+
+    def _add_event(self, event: dict[str, object]) -> None:
+        geo = event.get("geo", {})
+        if not isinstance(geo, Mapping) or "geo_id" not in geo:
+            raise ValueError("Alert history events must include geo.geo_id.")
+        payload = dict(event)
+        geo_id = str(geo["geo_id"])
+        self._events.setdefault(geo_id, []).append(payload)
+        self._sequence.append(payload)
+
+
+class JsonlAlertHistory(AlertHistory):
+    """JSONL-backed alert history store with replayable decision records."""
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        super().__init__()
+        self._load_existing()
+
+    def add(self, decision: AlertDecision) -> None:
+        payload = decision.to_dict()
+        self._add_event(payload)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, sort_keys=True) + "\n")
+
+    def _load_existing(self) -> None:
+        if not self.path.exists():
+            return
+        with self.path.open(encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, start=1):
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    event = json.loads(stripped)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(
+                        f"Invalid JSONL alert history at {self.path}:{line_number}"
+                    ) from exc
+                if not isinstance(event, dict):
+                    raise ValueError(
+                        f"Alert history event at {self.path}:{line_number} must be an object."
+                    )
+                self._add_event(event)
 
 
 class GeoAwareAlertEngine:
