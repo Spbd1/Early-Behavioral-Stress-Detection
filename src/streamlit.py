@@ -1,4 +1,5 @@
 """Minimal streamlit shim so dashboard module imports offline."""
+
 from __future__ import annotations
 
 

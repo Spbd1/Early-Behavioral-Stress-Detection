@@ -1,6 +1,9 @@
 import numpy as np
 
-from behavioral_stress.signal_discovery.retirement import flag_signal_retirement, kl_divergence_gaussian
+from behavioral_stress.signal_discovery.retirement import (
+    flag_signal_retirement,
+    kl_divergence_gaussian,
+)
 
 
 def test_kl_and_retirement_flag():

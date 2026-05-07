@@ -1,187 +1,47 @@
 # Milestone Tracker
 
-This tracker is initialized from `IMPLEMENTATION_PLAN.md`, `FINALIZATION_CHECKLIST.md`, and `ROADMAP.md`. It should be updated at the end of every implementation milestone. Status values are `Not started`, `In progress`, `Blocked`, `Validation pending`, `Complete`, or `Deferred`.
+Date: 2026-05-07
 
+## Current overall status
 
-## Final local validation update — 2026-05-07
+- **Classification:** experimental MVP / research prototype.
+- **Production readiness:** not production-ready.
+- **Validated path:** synthetic/offline/mock local path.
+- **Not validated:** live Google Trends, real browser automation, Docker runtime, production deployment, calibrated thresholds, and prospective real-world performance.
+- **Claim guardrail:** not a recession predictor.
 
-Scope: final local validation only; no new features were added. Validation was run in the local container on Python 3.14.4 with offline/mock paths where possible.
+## Milestones
 
-### Status classification
+| Milestone | Status | Evidence | Remaining work |
+| --- | --- | --- | --- |
+| Synthetic workflow | Implemented / locally validated | `run_synthetic_demo.py`, `run_validation.py`, pytest coverage | Broader scientific validation remains required |
+| Adaptive HMM MVP | Implemented / locally tested | Unit and workflow tests pass | Calibration and real-world robustness not established |
+| Ontology/keyword governance scaffold | Partial MVP | Local registry/RAG tests and docs | Human governance workflows and provider review remain deferred |
+| Google Trends ingestion | Offline/mock path validated | Dry-run config, cache, artifacts, and tests pass | Live pytrends/provider validation and legal review not done |
+| MVP BSI | Implemented as heuristic MVP | BSI contract tests and dashboard payloads | Full `BSI_DESIGN.md`, calibrated uncertainty, and approved thresholds deferred |
+| Geo-aware alerting/reporting | MVP implemented | Geo alerting/report tests pass; JSONL alert history exists | Production DB-backed replay/audit state and human workflow deferred |
+| Browser dashboard/static UI | Synthetic/demo-oriented MVP | Dashboard payload build and frontend static tests pass | Real Chrome automation and real-world monitoring validation not done |
+| Lint/quality gate | Passing | `ruff check` passes locally | Keep lint passing in future changes |
+| Docker/deployment | Scaffold only | Docker files/docs exist | Runtime validation not run in this final local pass |
 
-- **Project stage:** experimental MVP / research prototype.
-- **Production readiness:** **not production-ready**.
-- **Reason for conservative classification:** offline synthetic, mock-ingestion, dashboard payload, package-import, CLI-help, compile, and pytest checks pass locally, but live Google Trends ingestion, prospective real-world validation, calibrated thresholds, full browser automation, deployment rollback evidence, privacy/legal review, and model-risk approval remain unvalidated.
+## Historical notes now resolved
 
-### Passed local checks
+- Earlier notes that Google Trends config parsing/offline ingestion tests were broken are resolved for the offline/mock dry-run path.
+- Earlier notes that `ruff check` failed with about 120 violations are resolved; `ruff check` now passes locally.
 
-- `python -m compileall src scripts tests` completed successfully.
-- `pytest` completed successfully: 50 passed.
-- `PYTHONPATH=src python - <<'PY' ... import behavioral_stress ... PY` completed successfully.
-- CLI help checks completed successfully for ingestion CLI, Google Trends wrapper, dashboard server, dashboard helper, frontend data builder, synthetic demo, and validation runner.
-- Mock/offline Google Trends ingestion dry-run completed successfully using a temporary config and temporary output directories.
-- Dashboard data build completed successfully to a temporary `dashboard.json` and produced the expected `dashboard.v1` top-level contract keys.
-- Frontend/static smoke check completed successfully for required static files, asset references, and basic static-dashboard assumptions.
-- `PYTHONPATH=src python scripts/run_validation.py --config <temporary-validation-config>` completed successfully and wrote validation metrics to a temporary output directory.
-- `PYTHONPATH=src python scripts/run_synthetic_demo.py --config <temporary-synthetic-config>` completed successfully and wrote synthetic demo artifacts to a temporary output directory.
+## Risks carried forward
 
-### Checks that did not pass
+- Live providers can change behavior and scaling semantics.
+- Synthetic validation does not demonstrate real-world predictive performance.
+- MVP BSI reliability/uncertainty values are heuristic labels.
+- Geo comparisons remain high risk without local baselines and coverage review.
+- Operational use requires legal/privacy/model-risk review and deployment evidence.
 
-- `ruff check` was available but did **not** pass. It reported 120 lint violations, primarily `E501` line-length issues, import-order issues, quoted type annotations, and one unused import. This is a code-quality failure, not an environment limitation.
-- A first ad hoc dashboard payload assertion expected outdated keys (`responsible_use`, `series`, `metrics`) and failed. The check was corrected to the current `dashboard.v1` keys (`system`, `bsi`, `posterior`, `alerts`, `top_signals`) and then passed. The failed ad hoc assertion is not treated as a product failure, but it confirms that consumers must use the current dashboard schema.
+## Next milestones before stronger claims
 
-### Not run / not validated
-
-- Live Google Trends / pytrends ingestion was not run; only offline mock/dry-run ingestion was validated.
-- Full browser automation in Chrome or another real browser was not run.
-- Networked deployment, Docker runtime, CI pipeline, rollback, monitoring, privacy/legal review, and model-risk approval were not run locally.
-- No prospective real-world economic-stress validation or calibrated alert-threshold approval was performed.
-
-### Remaining risks
-
-- Real provider availability, scaling semantics, rate limits, and terms-of-service compliance are unvalidated.
-- The BSI and alert reliability/uncertainty fields remain MVP heuristics rather than calibrated scientific confidence intervals.
-- Dashboard geography rows are synthetic/demo metadata and should not be interpreted as validated geospatial monitoring.
-- Lint debt remains significant because `ruff check` fails.
-- Python 3.14.4 local validation is useful but does not replace the declared supported Python 3.10/3.11 compatibility matrix.
-
-### Remaining placeholders / deferred work
-
-- Synthetic-first configs and dashboards remain the validated path.
-- Real public-data connectors outside the experimental Google Trends path remain intentionally deferred.
-- The Langflow scaffold remains a scaffold/demo path, not a validated orchestration deployment.
-- Full BSI design-conformance work remains deferred: local baselines, robust anomalies, calibrated uncertainty, confidence, cross-signal agreement, and alert-threshold approval.
-
-## Must-have production requirements
-
-| ID | Milestone | Status | Blockers | Dependencies | Validation state | Technical debt notes |
-|---|---|---|---|---|---|---|
-| P0 | Governance, scope, and prototype boundary freeze | Not started | Stakeholder agreement needed for intended users, geographies, cadence, alert recipients, and prohibited uses. | None | Not validated; documentation and repository-claim review pending. | README warnings are partial; prototype/stub inventory needs an owner and update process. |
-| P1 | Source registry, contracts, and local storage foundation | Validation pending | Storage backend remains local filesystem; legal/terms review still required before scheduled live collection. | P0 | Partially validated by `tests/test_google_trends_ingestion.py`; local raw/processed/metadata separation and cache replay tests added. | Local CSV/JSON storage is sufficient for research replay but not an append-only production lake or governed source registry. |
-| P2 | Connector interface and Google Trends ingestion | Validation pending | Legal/terms review for source collection; pytrends remains an unofficial connector and should be replaceable if reliability requirements increase. | P0, P1 | Fixture-based tests added for retry/backoff, batching, cache replay, raw/processed separation, metadata, validation, and anchor normalization. Live-network tests intentionally excluded. | Connector abstraction, config, CLI, and filesystem cache now exist; remaining debt is provider volatility, source governance, and production storage hardening. |
-| P3 | Curated features, transform registry, and feature snapshots | Not started | Feature schema conventions, missing-data policy, and transform metadata format pending. | P1, P2 | Not validated; transform persistence, leakage, schema-ordering, and snapshot immutability tests pending. | Current winsorization/standardization helpers are not sufficient for inference-time reuse. |
-| P4 | Experiment tracking and model registry foundation | Not started | Registry backend and approval metadata format pending; dependency lock strategy pending. | P3 | Not validated; artifact metadata, diagnostics, registry transition, and rollback tests pending. | Current adaptive HMM is prototype-ready but lacks production artifact metadata and lifecycle states. |
-| P5 | Decision-time validation, baselines, and calibration governance | Not started | Event/target catalog definitions, label vintages, and review ownership pending. | P3, P4 | Not validated; decision-time backtest, baseline, calibration, robustness, and statistical review tests pending. | Synthetic validation exists, but real-world evidence and calibration governance are missing. |
-| P6 | Shadow-mode inference and drift monitoring | Not started | Scheduler choice, prediction store shape, monitoring thresholds, and internal report format pending. | P4, P5 | Not validated; idempotent inference, data-quality blocking, drift monitor, logging, dashboard, and runbook tests pending. | Drift monitoring is placeholder-only and operational observability is missing. |
-| P7 | Human-reviewed experimental alert workflow | Validation pending | Reviewer workflow owner, delivery policy, threshold calibration, and postmortem process pending before any external alert delivery. | P5, P6 | Partially validated by `tests/test_geo_alerting.py`; conservative geo-aware alert engine, yellow/orange/red levels, cooldown, false-positive suppression, explanation fields, alert history, structured JSON, BSI, geo comparison, and reporting guardrails added. | Alerting remains research/shadow-mode only until calibrated thresholds, statistical review, approval workflow, and delivery governance are approved. |
-| P8 | Security, deployment, and operational hardening | Not started | Deployment target, secrets provider, auth model, IaC platform, and SLO ownership pending. | P1-P7 for full production hardening; CI improvements can begin earlier after P0. | Not validated; CI, scan, access-control, backup/restore, rollback, and load tests pending. | CI/CD is partial; secrets, auth, IaC, backup/restore, and performance evidence are missing. |
-
-## Research enhancements
-
-| ID | Milestone | Status | Blockers | Dependencies | Validation state | Technical debt notes |
-|---|---|---|---|---|---|---|
-| R1 | Governed ontology and LLM keyword workflow | Validation pending | LLM provider terms review, sensitive-term policy, reviewer staffing, and production prompt governance remain pending. | P0; ingestion promotion also requires P2-P3. | Partially validated by `tests/test_keyword_generation.py`; local ontology categories, deterministic RAG grounding, geo-aware schema, review gates, deduplication, expansion limits, versioning, retirement, unsupported-location handling, and drift-review heuristics added. | Current workflow is deterministic/local and does not call an LLM; future LLM use must persist prompts, model versions, raw outputs, and reviewer decisions before promotion. |
-| R2 | Multi-source and multi-region research panels | Not started | Additional source selection, terms review, region scope, and cost expectations pending. | P1-P3; comparative validation requires P5. | Not validated; additional connector fixture tests and multi-region snapshot validation pending. | Single-source dependence remains a critical risk until another aggregate source is integrated. |
-| R3 | Robustness, placebo, and negative-control evidence pack | Not started | Approved event catalog, feature snapshots, and statistical review rubric pending. | P5 | Not validated; robustness report, placebo, negative-control, source-outage, and sensitivity tests pending. | Causal/validation modules exist but need registry-backed evidence packaging and caveat discipline. |
-| R4 | Advanced model comparison automation | Not started | Comparable model configurations, compute budget, and model promotion criteria pending. | P4, P5 | Not validated; model comparison runner and metric-parity tests pending. | Baseline coverage is partial and comparisons are not yet registry-backed. |
-
-## Optional experimental features
-
-| ID | Milestone | Status | Blockers | Dependencies | Validation state | Technical debt notes |
-|---|---|---|---|---|---|---|
-| X1 | Interactive research dashboard extensions | Deferred | Must not distract from storage, validation, and alert governance; access-control design pending for broad use. | P6 for artifact-backed display; P8 for non-local deployment. | Partially validated by `tests/test_geo_alerting.py` for dashboard-ready alert and geo-comparison payloads; read-only UI and artifact-citation smoke tests remain pending. | Dashboard-ready JSON exists for research use, but dashboard/demo scaffolds should not become de facto production orchestration. |
-| X2 | Cost and performance simulation harness | Deferred | Planned source/keyword/region volumes and provider cost assumptions pending. | P2-P3 for realistic parameters; P8 for load-test integration. | Not validated; deterministic simulator and load-test threshold tests pending. | No cost monitoring or capacity model exists. |
-| X3 | Automated periodic independent review package | Deferred | Reviewer process, access controls, and evidence-bundle scope pending. | P5; stronger value after P7 alert audit data; P8 for secure sharing. | Not validated; manifest generation and reproduction-instruction tests pending. | Independent review should not be represented as complete until human sign-off exists. |
-
-## Cross-milestone validation ledger
-
-| Validation area | Current state | Next milestone to advance | Notes |
-|---|---|---|---|
-| Repository claim/safety scan | Partial | P0 | README/BSI wording now states the validated runnable demo remains synthetic, real Google Trends ingestion is experimental, BSI is MVP, and outputs are not recession predictions. Broader claim scan remains pending. |
-| Source terms and registry review | In progress | P1 | Local source metadata exists, but legal/terms and production registry review remain required before scheduled live connector operation. |
-| Fixture-only connector tests | Added | P2 | `tests/test_google_trends_ingestion.py` covers retries, batching, cache replay, validation, normalization, and artifact separation without live Google calls. |
-| Immutable raw-to-feature replay | Partial | P3 | Raw, processed, cache, and metadata artifacts are separated for Google Trends, but immutable snapshot manifests are still pending. |
-| Model artifact reproducibility | Pending | P4 | Must include git commit, dependency lock, config hash, feature snapshot, and seed. |
-| Decision-time backtesting | Pending | P5 | Must prove no future information is used. |
-| Calibration and threshold approval | Pending | P5 | Required before any alert milestone can proceed. Current MVP BSI reliability and uncertainty fields are heuristic labels, not calibrated approval evidence. |
-| Shadow-mode operational health | Pending | P6 | Must run internally with no external delivery. |
-| Human-reviewed alert auditability | Partial for keyword governance and alert decision records | R1/P7 | Keyword candidates have human review states and version history; alert decisions now include criteria, suppressions, warnings, explanations, cooldown state, and recent history, but human approval gates and postmortems remain pending. |
-| Deployment and rollback evidence | Pending | P8 | Required for controlled production operation. |
-
-## Update protocol
-
-When a milestone implementation begins or completes:
-
-1. Update the milestone row status, blockers, dependencies, validation state, and technical debt notes.
-2. Link or name the validation artifacts produced by the milestone.
-3. Record any new risks in `docs/risk_register.md` once that file exists.
-4. Update `FINALIZATION_CHECKLIST.md` gate statuses only when code, configuration, tests, documentation, and operational evidence exist.
-5. Keep deferred optional work deferred unless it has no negative impact on must-have production requirements.
-
-## Documentation and BSI consistency update
-
-Completed narrow consistency fixes on 2026-05-07:
-
-- README distinguishes the validated synthetic demo from experimental real Google Trends ingestion.
-- `BehavioralStressIndex` is labeled as an implemented MVP BSI rather than the full `BSI_DESIGN.md` design.
-- MVP BSI output now includes reliability, limitations, warnings, an experimental warning, a not-recession-prediction warning, top contributors, score, severity band, uncertainty band, implementation label, and component values.
-- Alert persistence, Google Trends ingestion implementation, and frontend implementation were not changed.
-
-## Experimental production/frontend hardening update
-
-Completed additions for experimental production usage:
-
-- Docker runtime hardening with non-root execution, healthcheck command, dashboard service, and `.dockerignore`.
-- Runtime environment/config validation, deterministic seed enforcement, structured JSON logging, monitoring hooks, data lineage manifests, and derived model-version IDs.
-- CI workflow for install, health checks, tests, deterministic synthetic smoke run, frontend payload generation, and Docker build.
-- Chrome-friendly browser dashboard with conservative experimental labels, location/time/keyword filters, BSI chart, HMM posterior chart, alert timeline, top signals, geo comparison, report viewer, warnings, and export.
-- Validation guardrails for schema checks, temporal leakage detection, geo-data validation, alert backtesting, and report snapshots.
-- Deployment docs, operational playbooks, troubleshooting guide, reproducibility guide, and explicit reliability/production-safety risk register.
-
-Remaining roadmap items:
-
-- Prospective real-world validation with strict point-in-time data contracts.
-- Formal model-risk review, privacy/legal review, and incident response ownership before any non-research deployment.
-- Orchestrator-enforced rollback automation and monitored production telemetry integrations.
-- Stronger statistical drift tests, calibrated alert thresholds, and independent audit of geographic comparability.
-
-
-## Alert persistence and offline smoke validation update
-
-Completed on 2026-05-07:
-
-- Added optional JSONL-backed alert history persistence while keeping the in-memory history store as the unit-test/default implementation.
-- Added replay/load semantics for serialized alert decision history.
-- Added an offline end-to-end smoke test from synthetic/mocked observations through BSI, alert decision, report generation, and dashboard-ready JSON payload.
-- Added report language safety checks for “behavioral stress signal increased” and against “recession is coming.”
-- Added geo-safety tests for low-confidence city/metro and unsupported geography suppressions/warnings.
-
-Still deferred: Google Trends ingestion changes, frontend architecture changes, calibrated alert thresholds, provider-code validation, and live/provider integration validation.
-
-## Google Trends ingestion reliability/offline-testability milestone
-
-Status: completed for offline/mock ingestion reliability on 2026-05-07.
-
-Evidence added:
-
-- Optional pytrends handling with explicit live-ingestion error messaging.
-- Deterministic mock `TrendsClient` and dry-run CLI/config path.
-- Raw, processed, and metadata artifact schema validation.
-- Geography metadata preservation plus unsupported/low-volume warnings.
-- Offline tests for import behavior, dry-run artifact creation, CLI help, validators, retries, batching, caching, and normalization.
-
-Not completed / not claimed:
-
-- No live Google Trends integration validation.
-- No secrets or credentials added.
-- No production reliability guarantee for pytrends.
-
-## Dashboard/API/static frontend consistency milestone — completed 2026-05-07
-
-Status: completed for the requested dashboard/API/frontend consistency scope.
-
-Evidence added:
-
-- `dashboard.v1` payload schema/version plus dependency-free validation.
-- Snapshot-style pytest coverage for BSI, alerts, geo metadata, warning groups, reports, and static-mode metadata.
-- Frontend normalization for API-backed and generated-static JSON payloads.
-- UI display for experimental labeling, not-recession-prediction guardrail, data-quality warnings, drift warnings, and geo reliability warnings.
-- Static JSON report export remains available without requiring the dashboard API backend.
-- Chrome-friendly smoke test blocks known experimental browser API usage.
-
-Not completed / not claimed:
-
-- Live Google Trends validation.
-- Production-calibrated BSI or alert thresholds.
-- Full browser automation with a real Chrome instance.
-- Validated geospatial map rendering.
+1. Add real browser automation evidence for the dashboard.
+2. Run and document Docker/runtime validation.
+3. Design live Google Trends validation under legal/provider constraints.
+4. Add prospective point-in-time validation before real-world interpretation.
+5. Calibrate BSI thresholds and uncertainty with independent review.
+6. Replace MVP alert history with production-grade database-backed audit/replay state if operational use is pursued.

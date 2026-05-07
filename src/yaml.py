@@ -1,4 +1,5 @@
 """Small YAML reader/writer for simple mapping configs used in this project."""
+
 from __future__ import annotations
 
 import ast

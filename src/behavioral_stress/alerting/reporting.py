@@ -58,14 +58,10 @@ class ReportGenerator:
         return StressReport(structured=structured, markdown=markdown)
 
     @classmethod
-    def _assert_language_safe(
-        cls, markdown: str, structured: Mapping[str, object]
-    ) -> None:
+    def _assert_language_safe(cls, markdown: str, structured: Mapping[str, object]) -> None:
         serialized = f"{markdown} {structured}".lower()
         if cls.REQUIRED_SAFE_PHRASE not in serialized:
-            raise ValueError(
-                f"Report must include safe phrase: {cls.REQUIRED_SAFE_PHRASE!r}."
-            )
+            raise ValueError(f"Report must include safe phrase: {cls.REQUIRED_SAFE_PHRASE!r}.")
         for phrase in cls.FORBIDDEN_PHRASES:
             if phrase in serialized:
                 raise ValueError(f"Report contains forbidden predictive phrase: {phrase!r}.")

@@ -4,10 +4,11 @@ Thresholds used by these helpers should be chosen inside rolling-origin or
 nested validation folds.  The final test split should only be used once to
 report metrics for a pre-selected threshold.
 """
+
 from __future__ import annotations
 
 import math
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 _EPS = 1e-15
 
@@ -47,32 +48,46 @@ def binary_classification_metrics(
 def precision(y_true: Iterable[float], y_pred: Iterable[float], threshold: float = 0.5) -> float:
     """Return positive predictive value for binary labels and predictions."""
     truth, pred = _prepare_binary_inputs(y_true, y_pred, score_threshold=threshold)
-    tp = sum(1 for target, prediction in zip(truth, pred) if target == 1 and prediction == 1)
-    fp = sum(1 for target, prediction in zip(truth, pred) if target == 0 and prediction == 1)
+    tp = sum(
+        1 for target, prediction in zip(truth, pred, strict=True) if target == 1 and prediction == 1
+    )
+    fp = sum(
+        1 for target, prediction in zip(truth, pred, strict=True) if target == 0 and prediction == 1
+    )
     return tp / (tp + fp) if tp + fp else 0.0
 
 
 def recall(y_true: Iterable[float], y_pred: Iterable[float], threshold: float = 0.5) -> float:
     """Return sensitivity for binary labels and predictions."""
     truth, pred = _prepare_binary_inputs(y_true, y_pred, score_threshold=threshold)
-    tp = sum(1 for target, prediction in zip(truth, pred) if target == 1 and prediction == 1)
-    fn = sum(1 for target, prediction in zip(truth, pred) if target == 1 and prediction == 0)
+    tp = sum(
+        1 for target, prediction in zip(truth, pred, strict=True) if target == 1 and prediction == 1
+    )
+    fn = sum(
+        1 for target, prediction in zip(truth, pred, strict=True) if target == 1 and prediction == 0
+    )
     return tp / (tp + fn) if tp + fn else 0.0
 
 
-def false_positive_rate(y_true: Iterable[float], y_pred: Iterable[float], threshold: float = 0.5) -> float:
+def false_positive_rate(
+    y_true: Iterable[float], y_pred: Iterable[float], threshold: float = 0.5
+) -> float:
     """Return the false-positive rate for binary labels and predictions."""
     truth, pred = _prepare_binary_inputs(y_true, y_pred, score_threshold=threshold)
-    fp = sum(1 for target, prediction in zip(truth, pred) if target == 0 and prediction == 1)
-    tn = sum(1 for target, prediction in zip(truth, pred) if target == 0 and prediction == 0)
+    fp = sum(
+        1 for target, prediction in zip(truth, pred, strict=True) if target == 0 and prediction == 1
+    )
+    tn = sum(
+        1 for target, prediction in zip(truth, pred, strict=True) if target == 0 and prediction == 0
+    )
     return fp / (fp + tn) if fp + tn else 0.0
 
 
 def roc_auc(y_true: Iterable[float], y_score: Iterable[float]) -> float:
     """Return rank-based ROC-AUC with a finite degenerate-label fallback."""
     truth, scores = _prepare_binary_inputs(y_true, y_score)
-    positives = [score for target, score in zip(truth, scores) if target == 1]
-    negatives = [score for target, score in zip(truth, scores) if target == 0]
+    positives = [score for target, score in zip(truth, scores, strict=True) if target == 1]
+    negatives = [score for target, score in zip(truth, scores, strict=True) if target == 0]
     if not positives or not negatives:
         return 0.5
 
@@ -95,7 +110,7 @@ def pr_auc(y_true: Iterable[float], y_score: Iterable[float]) -> float:
     if total_pos == len(truth):
         return 1.0
 
-    pairs = sorted(zip(scores, truth), key=lambda item: item[0], reverse=True)
+    pairs = sorted(zip(scores, truth, strict=True), key=lambda item: item[0], reverse=True)
     hits = 0
     precision_sum = 0.0
     for rank, (_, target) in enumerate(pairs, start=1):
@@ -110,22 +125,29 @@ def brier_score(y_true: Iterable[float], y_score: Iterable[float]) -> float:
     truth, scores = _prepare_binary_inputs(y_true, y_score)
     if not scores:
         return 0.0
-    return sum((_clip_probability(score) - target) ** 2 for target, score in zip(truth, scores)) / len(scores)
+    return sum(
+        (_clip_probability(score) - target) ** 2
+        for target, score in zip(truth, scores, strict=True)
+    ) / len(scores)
 
 
-def out_of_sample_log_predictive_density(y_true: Iterable[float], y_score: Iterable[float]) -> float:
+def out_of_sample_log_predictive_density(
+    y_true: Iterable[float], y_score: Iterable[float]
+) -> float:
     """Return mean held-out Bernoulli log predictive density."""
     truth, scores = _prepare_binary_inputs(y_true, y_score)
     if not scores:
         return 0.0
     log_density = 0.0
-    for target, score in zip(truth, scores):
+    for target, score in zip(truth, scores, strict=True):
         probability = _clip_probability(score)
         log_density += math.log(probability) if target == 1 else math.log1p(-probability)
     return log_density / len(scores)
 
 
-def simple_lead_time(y_true: Iterable[float], y_score: Iterable[float], threshold: float = 0.5) -> float:
+def simple_lead_time(
+    y_true: Iterable[float], y_score: Iterable[float], threshold: float = 0.5
+) -> float:
     """Return periods by which the first alarm precedes the first event.
 
     A positive value means the first threshold crossing occurred before the first
@@ -209,7 +231,9 @@ def oos_log_predictive_density(y_true: Iterable[float], y_score: Iterable[float]
     return out_of_sample_log_predictive_density(y_true, y_score)
 
 
-def lead_time_metric(y_true: Iterable[float], y_score: Iterable[float], threshold: float = 0.5) -> float:
+def lead_time_metric(
+    y_true: Iterable[float], y_score: Iterable[float], threshold: float = 0.5
+) -> float:
     """Alias for the simple lead-time metric."""
     return simple_lead_time(y_true, y_score, threshold=threshold)
 

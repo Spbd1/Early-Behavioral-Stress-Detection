@@ -1,4 +1,5 @@
 """Command-line interface for ingestion pipelines."""
+
 from __future__ import annotations
 
 import argparse

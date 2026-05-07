@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Sequence
 
 import numpy as np
+
 from scipy.special import logsumexp
 from scipy.stats import multivariate_normal
-
 from sklearn.cluster import KMeans
-
 
 EPS = 1e-12
 MIN_VARIANCE = 1e-6
@@ -92,13 +91,15 @@ class AdaptiveHMM:
         self.log_likelihood_: float | None = None
         self._online_filtered: np.ndarray | None = None
 
-    def fit(self, observations: object) -> "AdaptiveHMM":
+    def fit(self, observations: object) -> AdaptiveHMM:
         rows = self._as_matrix(observations)
         if rows.shape[0] < self.n_states:
             raise ValueError("Need at least n_states observations")
 
         labels = self._initial_labels(rows)
-        self.initial_probs_ = self._normalize_vector(np.bincount([labels[0]], minlength=self.n_states))
+        self.initial_probs_ = self._normalize_vector(
+            np.bincount([labels[0]], minlength=self.n_states)
+        )
         self.transition_matrix_ = self._estimate_transition_from_labels(labels)
         self.means_, self.covariances_ = self._estimate_gaussians(rows, labels)
 
@@ -111,7 +112,9 @@ class AdaptiveHMM:
 
             self.initial_probs_ = self._normalize_vector(gamma[0])
             self.transition_matrix_ = self._normalize_rows(xi_sum)
-            self.means_, self.covariances_ = self._estimate_gaussians_from_responsibilities(rows, gamma)
+            self.means_, self.covariances_ = self._estimate_gaussians_from_responsibilities(
+                rows, gamma
+            )
 
             current_log_likelihood = float(forward_result.log_likelihood)
             if abs(current_log_likelihood - previous_log_likelihood) <= self.tol:
@@ -147,7 +150,9 @@ class AdaptiveHMM:
 
         probabilities = self._normalize_rows(probabilities)
         log_likelihood = float(np.log(scales).sum())
-        return ForwardResult(probabilities=probabilities, scales=scales, log_likelihood=log_likelihood)
+        return ForwardResult(
+            probabilities=probabilities, scales=scales, log_likelihood=log_likelihood
+        )
 
     def backward(self, observations: object, scales: Sequence[float] | None = None) -> np.ndarray:
         self._check_fitted()
@@ -266,7 +271,7 @@ class AdaptiveHMM:
         Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: str | Path) -> "AdaptiveHMM":
+    def load(cls, path: str | Path) -> AdaptiveHMM:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
         model = cls(
             n_states=int(payload["n_states"]),
@@ -279,7 +284,9 @@ class AdaptiveHMM:
         model.initial_probs_ = np.asarray(payload["initial_probs"], dtype=float)
         model.transition_matrix_ = model._normalize_rows(payload["transition_matrix"])
         model.means_ = np.asarray(payload["means"], dtype=float)
-        model.covariances_ = np.maximum(np.asarray(payload["covariances"], dtype=float), MIN_VARIANCE)
+        model.covariances_ = np.maximum(
+            np.asarray(payload["covariances"], dtype=float), MIN_VARIANCE
+        )
         model.log_likelihood_ = float(payload["log_likelihood"])
         return model
 
@@ -306,7 +313,9 @@ class AdaptiveHMM:
         return rows.astype(float, copy=False)
 
     def _initial_labels(self, rows: np.ndarray) -> np.ndarray:
-        labels = KMeans(n_clusters=self.n_states, n_init=10, random_state=self.random_seed).fit_predict(rows)
+        labels = KMeans(
+            n_clusters=self.n_states, n_init=10, random_state=self.random_seed
+        ).fit_predict(rows)
         labels = np.asarray(labels, dtype=int)
         if labels.shape == (rows.shape[0],):
             return labels
@@ -322,11 +331,13 @@ class AdaptiveHMM:
         if labels.shape[0] == 1:
             counts[labels[0], labels[0]] += 1.0
         else:
-            for source, target in zip(labels[:-1], labels[1:]):
+            for source, target in zip(labels[:-1], labels[1:], strict=True):
                 counts[int(source), int(target)] += 1.0
         return self._normalize_rows(counts)
 
-    def _estimate_gaussians(self, rows: np.ndarray, labels: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _estimate_gaussians(
+        self, rows: np.ndarray, labels: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
         responsibilities = np.zeros((rows.shape[0], self.n_states), dtype=float)
         responsibilities[np.arange(rows.shape[0]), labels] = 1.0
         return self._estimate_gaussians_from_responsibilities(rows, responsibilities)
@@ -348,9 +359,9 @@ class AdaptiveHMM:
                 continue
             means[state] = (responsibilities[:, state, None] * rows).sum(axis=0) / weights[state]
             centered = rows - means[state]
-            covariances[state] = (
-                responsibilities[:, state, None] * centered * centered
-            ).sum(axis=0) / weights[state]
+            covariances[state] = (responsibilities[:, state, None] * centered * centered).sum(
+                axis=0
+            ) / weights[state]
         return means, np.maximum(covariances, MIN_VARIANCE)
 
     def _expected_transition_counts(

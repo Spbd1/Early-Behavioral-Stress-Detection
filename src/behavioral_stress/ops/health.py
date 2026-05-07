@@ -1,4 +1,5 @@
 """Health check aggregation for CLI, Docker, and API use."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

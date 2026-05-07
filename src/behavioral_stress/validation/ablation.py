@@ -1,4 +1,5 @@
 """Ablation labels and lightweight runner placeholders."""
+
 from __future__ import annotations
 
 ABLATION_VARIANTS = [

@@ -1,4 +1,5 @@
 """Minimal SARIMAX shim."""
+
 from __future__ import annotations
 
 

@@ -1,4 +1,5 @@
 """Runnable equivalent to the documented Langflow synthetic pipeline."""
+
 from __future__ import annotations
 
 import json

@@ -1,4 +1,5 @@
 """Build Chrome-friendly dashboard data from workflow artifacts."""
+
 from __future__ import annotations
 
 import json
@@ -31,7 +32,8 @@ def build_dashboard_payload(
     drift_warnings = ["Drift checks are sentinels only; investigate before acting."]
     geo_reliability_warnings = [
         "Geo comparison rows are synthetic/demo metadata and are not a validated map.",
-        "Cross-geography interpretation must account for local baselines, sample size, and provider coverage.",
+        "Cross-geography interpretation must account for local baselines, "
+        "sample size, and provider coverage.",
     ]
 
     posterior = _read_csv(data_path / "posterior.csv")
@@ -40,9 +42,7 @@ def build_dashboard_payload(
     viterbi = _read_csv(data_path / "viterbi_path.csv")
 
     if posterior.empty:
-        quality_warnings.append(
-            "No posterior artifact found. Run the synthetic workflow first."
-        )
+        quality_warnings.append("No posterior artifact found. Run the synthetic workflow first.")
     if observations.empty:
         quality_warnings.append(
             "No observation artifact found; top contributing signals are unavailable."
@@ -171,7 +171,9 @@ def validate_dashboard_payload(payload: dict[str, Any]) -> None:
                 "warnings": list,
             },
         )
-    _require_keys(payload["report"], {"title": str, "summary": str, "metrics": list, "alert_count": int})
+    _require_keys(
+        payload["report"], {"title": str, "summary": str, "metrics": list, "alert_count": int}
+    )
 
 
 def _require_keys(row: dict[str, Any], required: dict[str, type | tuple[type, ...]]) -> None:
@@ -233,10 +235,16 @@ def _alert_timeline(bsi: list[dict[str, Any]], viterbi: pd.DataFrame) -> list[di
             {
                 "date": point["date"],
                 "level": point["severity_band"],
-                "message": "BSI threshold crossing for analyst research review only; not a recession prediction.",
+                "message": (
+                    "BSI threshold crossing for analyst research review only; "
+                    "not a recession prediction."
+                ),
                 "bsi_score": point["value"],
                 "severity_band": point["severity_band"],
-                "warnings": ["Requires data-quality, drift, and geo reliability review before interpretation."],
+                "warnings": [
+                    "Requires data-quality, drift, and geo reliability review "
+                    "before interpretation."
+                ],
             }
         )
     if not alerts and not viterbi.empty:
@@ -259,8 +267,7 @@ def _top_signals(observations: pd.DataFrame) -> list[dict[str, Any]]:
     numeric = observations.select_dtypes(include="number")
     scores = numeric.abs().tail(min(12, len(numeric))).mean().sort_values(ascending=False).head(8)
     return [
-        {"signal": name, "contribution": round(float(value), 3)}
-        for name, value in scores.items()
+        {"signal": name, "contribution": round(float(value), 3)} for name, value in scores.items()
     ]
 
 

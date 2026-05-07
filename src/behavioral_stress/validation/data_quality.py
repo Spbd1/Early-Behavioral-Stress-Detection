@@ -1,4 +1,5 @@
 """Data and report validation guardrails."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

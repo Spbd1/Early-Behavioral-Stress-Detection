@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Validate the Langflow scaffold and print import instructions."""
+
 from __future__ import annotations
 
 import argparse
@@ -7,7 +8,6 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FLOW = Path("langflow/behavioral_stress_flow.json")
@@ -20,7 +20,15 @@ REQUIRED_COMPONENTS = [
     "validation_metrics_component.py",
     "report_component.py",
 ]
-REQUIRED_NODES = {"config", "synthetic_data", "preprocessing", "ontology", "adaptive_hmm", "metrics", "report"}
+REQUIRED_NODES = {
+    "config",
+    "synthetic_data",
+    "preprocessing",
+    "ontology",
+    "adaptive_hmm",
+    "metrics",
+    "report",
+}
 REQUIRED_EDGES = [
     ["config", "synthetic_data"],
     ["synthetic_data", "preprocessing"],
@@ -45,12 +53,29 @@ def _default_flow_payload() -> dict[str, Any]:
         "name": "behavioral_stress_synthetic_workflow",
         "description": "Synthetic aggregate latent-regime research workflow.",
         "nodes": [
-            {"id": "config", "type": "input_config", "label": "Input Config", "config_path": "configs/synthetic.yaml"},
-            {"id": "synthetic_data", "type": "custom_component", "component": "SyntheticDataComponent"},
-            {"id": "preprocessing", "type": "custom_component", "component": "PreprocessingComponent"},
+            {
+                "id": "config",
+                "type": "input_config",
+                "label": "Input Config",
+                "config_path": "configs/synthetic.yaml",
+            },
+            {
+                "id": "synthetic_data",
+                "type": "custom_component",
+                "component": "SyntheticDataComponent",
+            },
+            {
+                "id": "preprocessing",
+                "type": "custom_component",
+                "component": "PreprocessingComponent",
+            },
             {"id": "ontology", "type": "custom_component", "component": "OntologySignalComponent"},
             {"id": "adaptive_hmm", "type": "custom_component", "component": "AdaptiveHMMComponent"},
-            {"id": "metrics", "type": "custom_component", "component": "ValidationMetricsComponent"},
+            {
+                "id": "metrics",
+                "type": "custom_component",
+                "component": "ValidationMetricsComponent",
+            },
             {"id": "report", "type": "custom_component", "component": "ReportComponent"},
         ],
         "edges": REQUIRED_EDGES,
@@ -97,11 +122,18 @@ def _validate_flow(payload: dict[str, Any], flow_path: Path, component_dir: Path
 
     warning = str(payload.get("responsible_use_warning", ""))
     if "not a validated recession predictor" not in warning.lower():
-        raise RuntimeError("Flow must include a responsible-use warning that it is not a validated recession predictor.")
+        raise RuntimeError(
+            "Flow must include a responsible-use warning that it is not a "
+            "validated recession predictor."
+        )
 
-    missing_components = [name for name in REQUIRED_COMPONENTS if not (component_dir / name).exists()]
+    missing_components = [
+        name for name in REQUIRED_COMPONENTS if not (component_dir / name).exists()
+    ]
     if missing_components:
-        raise RuntimeError(f"Missing custom components in {component_dir}: {', '.join(missing_components)}")
+        raise RuntimeError(
+            f"Missing custom components in {component_dir}: {', '.join(missing_components)}"
+        )
 
     if not flow_path.exists():
         raise RuntimeError(f"Flow was not written: {flow_path}")
@@ -110,8 +142,9 @@ def _validate_flow(payload: dict[str, Any], flow_path: Path, component_dir: Path
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Validate or generate the Langflow demo JSON for the behavioral-stress research prototype. "
-            "This is not a reliable recession prediction tool."
+            "Validate or generate the Langflow demo JSON for the "
+            "behavioral-stress research prototype. This is not a reliable "
+            "recession prediction tool."
         )
     )
     parser.add_argument(
@@ -137,8 +170,14 @@ def main() -> int:
         print(f"ERROR: Langflow demo export failed: {exc}", file=sys.stderr)
         return 1
 
-    display_flow = flow_path.relative_to(REPO_ROOT) if flow_path.is_relative_to(REPO_ROOT) else flow_path
-    display_components = component_dir.relative_to(REPO_ROOT) if component_dir.is_relative_to(REPO_ROOT) else component_dir
+    display_flow = (
+        flow_path.relative_to(REPO_ROOT) if flow_path.is_relative_to(REPO_ROOT) else flow_path
+    )
+    display_components = (
+        component_dir.relative_to(REPO_ROOT)
+        if component_dir.is_relative_to(REPO_ROOT)
+        else component_dir
+    )
     print(f"Validated Langflow flow JSON: {display_flow}")
     print(f"Custom components: {display_components}")
     print(f"Warning: {payload['responsible_use_warning']}")
@@ -146,7 +185,11 @@ def main() -> int:
     print("1. pip install -e .[langflow]")
     print("2. langflow run")
     print(f"3. Import {display_flow} in Langflow.")
-    print(f"4. Add custom components from {display_components} if your Langflow installation does not load them automatically.")
+    print(
+        "4. Add custom components from "
+        f"{display_components} if your Langflow installation does not load "
+        "them automatically."
+    )
     print("Fallback runner: python scripts/run_synthetic_demo.py --config configs/synthetic.yaml")
     return 0
 

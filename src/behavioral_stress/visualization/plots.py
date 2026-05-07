@@ -1,4 +1,5 @@
 """Plotly figures for synthetic latent-regime outputs."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -7,7 +8,7 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
-def posterior_regime_plot(posterior: "pd.DataFrame") -> Any:
+def posterior_regime_plot(posterior: pd.DataFrame) -> Any:
     """Plot posterior regime probabilities over time."""
     import plotly.express as px
 
@@ -21,9 +22,10 @@ def posterior_regime_plot(posterior: "pd.DataFrame") -> Any:
     return figure
 
 
-def regime_path_plot(path: "pd.Series | pd.DataFrame") -> Any:
+def regime_path_plot(path: pd.Series | pd.DataFrame) -> Any:
     """Plot a Viterbi or most-likely regime path over time."""
     import pandas as pd
+
     import plotly.express as px
 
     if isinstance(path, pd.DataFrame):
@@ -42,7 +44,7 @@ def regime_path_plot(path: "pd.Series | pd.DataFrame") -> Any:
     return figure
 
 
-def transition_heatmap(transition: "pd.DataFrame") -> Any:
+def transition_heatmap(transition: pd.DataFrame) -> Any:
     """Plot transition matrix heatmap."""
     import plotly.graph_objects as go
 
@@ -58,11 +60,13 @@ def transition_heatmap(transition: "pd.DataFrame") -> Any:
             hovertemplate="from %{y}<br>to %{x}<br>p=%{z:.3f}<extra></extra>",
         )
     )
-    figure.update_layout(title="Transition matrix heatmap", xaxis_title="to regime", yaxis_title="from regime")
+    figure.update_layout(
+        title="Transition matrix heatmap", xaxis_title="to regime", yaxis_title="from regime"
+    )
     return figure
 
 
-def feature_plot(observations: "pd.DataFrame", max_features: int = 6) -> Any:
+def feature_plot(observations: pd.DataFrame, max_features: int = 6) -> Any:
     """Plot a small set of aggregate observation features over time."""
     import plotly.express as px
 

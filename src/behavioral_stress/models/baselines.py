@@ -1,8 +1,10 @@
 """Simple baseline models for research comparisons."""
+
 from __future__ import annotations
 
 import numpy as np
-from sklearn.linear_model import LogisticRegression, LinearRegression
+
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 
@@ -12,7 +14,7 @@ class LogisticRegressionBaseline:
     def __init__(self) -> None:
         self.model = LogisticRegression(max_iter=1000)
 
-    def fit(self, x: np.ndarray, y: np.ndarray) -> "LogisticRegressionBaseline":
+    def fit(self, x: np.ndarray, y: np.ndarray) -> LogisticRegressionBaseline:
         self.model.fit(x, y)
         return self
 
@@ -23,8 +25,10 @@ class LogisticRegressionBaseline:
 class SARIMAXBaseline:
     """Univariate SARIMAX baseline for one aggregate trace."""
 
-    def fit(self, y: np.ndarray, order: tuple[int, int, int] = (1, 0, 0)) -> "SARIMAXBaseline":
-        self.result_ = SARIMAX(y, order=order, enforce_stationarity=False, enforce_invertibility=False).fit(disp=False)
+    def fit(self, y: np.ndarray, order: tuple[int, int, int] = (1, 0, 0)) -> SARIMAXBaseline:
+        self.result_ = SARIMAX(
+            y, order=order, enforce_stationarity=False, enforce_invertibility=False
+        ).fit(disp=False)
         return self
 
     def forecast(self, steps: int) -> np.ndarray:
@@ -40,7 +44,7 @@ class UnivariateTraceRegressionBaseline:
     def __init__(self) -> None:
         self.model = LinearRegression()
 
-    def fit(self, trace: np.ndarray, y: np.ndarray) -> "UnivariateTraceRegressionBaseline":
+    def fit(self, trace: np.ndarray, y: np.ndarray) -> UnivariateTraceRegressionBaseline:
         self.model.fit(np.asarray(trace).reshape(-1, 1), y)
         return self
 
@@ -52,11 +56,15 @@ class LSTMBaseline:
     """Placeholder; neural baselines are intentionally not overbuilt in this prototype."""
 
     def fit(self, *_args: object, **_kwargs: object) -> None:
-        raise NotImplementedError("LSTM baseline is outside the lightweight synthetic prototype scope.")
+        raise NotImplementedError(
+            "LSTM baseline is outside the lightweight synthetic prototype scope."
+        )
 
 
 class TransformerBaseline:
     """Placeholder; neural baselines are intentionally not overbuilt in this prototype."""
 
     def fit(self, *_args: object, **_kwargs: object) -> None:
-        raise NotImplementedError("Transformer baseline is outside the lightweight synthetic prototype scope.")
+        raise NotImplementedError(
+            "Transformer baseline is outside the lightweight synthetic prototype scope."
+        )

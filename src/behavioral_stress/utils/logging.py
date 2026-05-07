@@ -1,4 +1,5 @@
 """Logging setup for scripts and notebooks."""
+
 from __future__ import annotations
 
 import logging

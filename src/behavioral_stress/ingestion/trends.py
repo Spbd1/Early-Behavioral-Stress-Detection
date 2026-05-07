@@ -1,4 +1,5 @@
 """Google Trends ingestion pipeline with batching, caching, and normalization."""
+
 from __future__ import annotations
 
 import json
@@ -262,8 +263,7 @@ class GoogleTrendsIngestionPipeline:
         non_anchor = [keyword for keyword in keywords if keyword != anchor]
         batch_capacity = payload_size - 1 if anchor else payload_size
         batches = [
-            non_anchor[i : i + batch_capacity]
-            for i in range(0, len(non_anchor), batch_capacity)
+            non_anchor[i : i + batch_capacity] for i in range(0, len(non_anchor), batch_capacity)
         ]
         if anchor:
             return [[anchor, *batch] for batch in batches]

@@ -3,14 +3,19 @@ import json
 from pathlib import Path
 
 import yaml
-
 from behavioral_stress.workflows.synthetic_workflow import run_synthetic_workflow
 
 
 def test_run_synthetic_workflow_completes(tmp_path):
     cfg = {
         "random_seed": 3,
-        "synthetic": {"n_steps": 50, "n_states": 3, "n_features": 6, "n_covariates": 1, "random_seed": 3},
+        "synthetic": {
+            "n_steps": 50,
+            "n_states": 3,
+            "n_features": 6,
+            "n_covariates": 1,
+            "random_seed": 3,
+        },
         "model": {"n_states": 3, "covariance_type": "diagonal", "forgetting_rate": 0.05},
         "outputs": {"directory": str(tmp_path)},
     }

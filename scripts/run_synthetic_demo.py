@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Run the synthetic AdaptiveHMM demo and write expected output files."""
+
 from __future__ import annotations
 
 import argparse
@@ -7,7 +8,6 @@ import importlib.util
 import sys
 from pathlib import Path
 from typing import Any
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
@@ -48,7 +48,9 @@ def _validate_outputs(result: dict[str, Any]) -> None:
 
     missing_files = [name for name, file_path in files.items() if not Path(file_path).exists()]
     if missing_files:
-        raise RuntimeError(f"Workflow reported outputs that were not written: {', '.join(sorted(missing_files))}")
+        raise RuntimeError(
+            f"Workflow reported outputs that were not written: {', '.join(sorted(missing_files))}"
+        )
 
 
 def _missing_runtime_packages() -> list[str]:
@@ -66,7 +68,10 @@ def main() -> int:
         "--config",
         type=Path,
         default=Path("configs/synthetic.yaml"),
-        help="Path to the synthetic workflow YAML config, relative to the repository root by default.",
+        help=(
+            "Path to the synthetic workflow YAML config, relative to the "
+            "repository root by default."
+        ),
     )
     args = parser.parse_args()
 
@@ -77,7 +82,8 @@ def main() -> int:
     missing_packages = _missing_runtime_packages()
     if missing_packages:
         print(
-            "ERROR: synthetic demo requires missing Python packages: " + ", ".join(missing_packages)
+            "ERROR: synthetic demo requires missing Python packages: "
+            + ", ".join(missing_packages)
             + ". Install project dependencies with: pip install -e .",
             file=sys.stderr,
         )
@@ -93,7 +99,8 @@ def main() -> int:
         return 1
 
     print(f"Wrote synthetic demo outputs to {result['output_dir']}")
-    print(f"Warning: {result.get('warning', 'Research prototype; not a reliable recession predictor.')}")
+    warning = result.get("warning", "Research prototype; not a reliable recession predictor.")
+    print(f"Warning: {warning}")
     print("Metrics:")
     for name, value in result["metrics"].items():
         print(f"  {name}: {value}")

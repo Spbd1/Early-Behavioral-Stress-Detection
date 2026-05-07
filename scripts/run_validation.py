@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Run validation for the synthetic latent-regime research prototype."""
+
 from __future__ import annotations
 
 import argparse
@@ -7,7 +8,6 @@ import importlib.util
 import sys
 from pathlib import Path
 from typing import Any
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
@@ -33,11 +33,15 @@ def _validate_workflow_outputs(result: dict[str, Any]) -> None:
 
     missing_keys = sorted(REQUIRED_VALIDATION_OUTPUTS - set(files))
     if missing_keys:
-        raise RuntimeError(f"Validation result is missing output entries: {', '.join(missing_keys)}")
+        raise RuntimeError(
+            f"Validation result is missing output entries: {', '.join(missing_keys)}"
+        )
 
     missing_files = [name for name in REQUIRED_VALIDATION_OUTPUTS if not Path(files[name]).exists()]
     if missing_files:
-        raise RuntimeError(f"Validation outputs were not written: {', '.join(sorted(missing_files))}")
+        raise RuntimeError(
+            f"Validation outputs were not written: {', '.join(sorted(missing_files))}"
+        )
 
 
 def _missing_runtime_packages() -> list[str]:
@@ -66,13 +70,15 @@ def main() -> int:
     missing_packages = _missing_runtime_packages()
     if missing_packages:
         print(
-            "ERROR: validation workflow requires missing Python packages: " + ", ".join(missing_packages)
+            "ERROR: validation workflow requires missing Python packages: "
+            + ", ".join(missing_packages)
             + ". Install project dependencies with: pip install -e .",
             file=sys.stderr,
         )
         return 1
 
     import pandas as pd
+
     from behavioral_stress.workflows.synthetic_workflow import run_synthetic_workflow
 
     try:
@@ -85,7 +91,8 @@ def main() -> int:
         return 1
 
     print(f"Validation metrics written to {metrics_path}")
-    print(f"Warning: {result.get('warning', 'Research prototype; not a reliable recession predictor.')}")
+    warning = result.get("warning", "Research prototype; not a reliable recession predictor.")
+    print(f"Warning: {warning}")
     print("Metrics:")
     for name, value in result["metrics"].items():
         print(f"  {name}: {value}")

@@ -6,9 +6,7 @@ from behavioral_stress.ontology.ontology import REQUIRED_CODEBOOK_COLUMNS
 
 
 def test_generated_shapes_codebook_metadata_and_non_empty_columns():
-    data = generate_synthetic_regime_data(
-        n_steps=40, n_states=3, n_features=9, n_covariates=2
-    )
+    data = generate_synthetic_regime_data(n_steps=40, n_states=3, n_features=9, n_covariates=2)
 
     assert isinstance(data, SyntheticRegimeData)
     assert data.observations.shape == (40, 9)
@@ -20,10 +18,7 @@ def test_generated_shapes_codebook_metadata_and_non_empty_columns():
         data.metadata["ontology_mapping"]["level_1"]
         == "immediate elastic discretionary contraction"
     )
-    assert (
-        data.metadata["ontology_mapping"]["level_2"]
-        == "deferred/semi-essential adjustment"
-    )
+    assert data.metadata["ontology_mapping"]["level_2"] == "deferred/semi-essential adjustment"
     assert data.metadata["ontology_mapping"]["level_3"] == (
         "substitution/persistence/micro-luxury response"
     )

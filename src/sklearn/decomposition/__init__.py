@@ -1,4 +1,5 @@
 """Minimal decomposition shims."""
+
 from __future__ import annotations
 
 

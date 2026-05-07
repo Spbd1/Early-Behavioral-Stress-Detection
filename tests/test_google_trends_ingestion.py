@@ -137,7 +137,6 @@ google_trends:
     assert config.retry.max_attempts == 5
 
 
-
 def test_import_and_mock_client_do_not_require_pytrends(tmp_path):
     config = _config(tmp_path).__class__(**{**_config(tmp_path).__dict__, "dry_run": True})
     pipeline = GoogleTrendsIngestionPipeline(config)
